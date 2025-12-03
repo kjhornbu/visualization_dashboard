@@ -11,7 +11,6 @@ from dash.dependencies import Input, Output
 import pandas as pd
 import plotly.graph_objs as go
 import plotly.express as px
-import sqlite3
 import re
 
 #Input and Organize Data Sheets
@@ -29,7 +28,7 @@ def set_groupings(data, mode):
     return groupings
 
 class StatsStructure:
-       def __init__(self,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame,groupings:dict):
+       def __init__(self,row_idx:pd.Series,row_description:pd.Series,data: pd.DataFrame):
         self.row_idx = row_idx
         self.row_description = row_description
         self.data = data
@@ -49,14 +48,8 @@ def load_data(path,mode):
     data_comments=data.iloc[1]
     data = data.drop([data.index[0],data.index[1]]).reset_index()
     
-    myData=DataStructure # Create Data (indiv or Group) class
-    
-    #assign data to it
-    myData.row_idx = data_col_idx
-    myData.row_description = data_comments
-    myData.data = data
-    myData.mode=mode
-    
+    myData=DataStructure(row_idx = data_col_idx,row_description = data_comments,data = data,mode=mode,groupings=None) # Create Data (indiv or Group) class
+
     #find the groupings within the data
     groupings=set_groupings(myData, mode)
     
@@ -70,18 +63,14 @@ def load_stats(path):
     stats_comments=stats.iloc[1]
     stats = stats.drop([stats.index[0],stats.index[1]]).reset_index()
     
-    myStats = StatsStructure
+    myStats = StatsStructure(row_idx = stats_col_idx,row_description = stats_comments,data = stats)
     #assign data to it
-    
-    myStats.row_idx = stats_col_idx
-    myStats.row_description = stats_comments
-    myStats.data = stats
     
     return myStats
 
 Group_Stats = load_stats('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv')
-Group_Data=load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
-Indiv_Data=load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
+Group_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
+Indiv_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
@@ -89,7 +78,7 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     html.H1(children='Aging BXD Visualization Dashboard', style={'textAlign':'center', 'color':"#91472a", 'font-size':24}),#Include style for title
      html.Div([
-        html.Label("Run Dashboard:"),
+        html.Label("Dashboard Inputs:"),
         dcc.Dropdown(
             id='dropdown-run',
             options={'Yes': 'Yes',
@@ -132,17 +121,17 @@ def update_output_container (run,mode):
         return plot_by_config(config,Group_Data,Group_Stats)
     else: 
         return None
+    
 class Config: 
-    def __init__(self,sheetname:str,x:str,y:str,config_reducereorder:dict,config_filter:dict):
-        self.use_sheet = sheetname
+    def __init__(self,use_sheet:str,x:str,y:str,groups_to_include:dict,config_reducereorder:dict,config_filter:dict):
+        self.use_sheet = use_sheet
         self.x = x
         self.y = y
+        self.groups_to_include=groups_to_include
         self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y)
         self.filter = config_filter #Things applied to the Group Stats data set
 
 def create_config_manual():
-    myconfig = Config
-    
     '''
     source_of_variation=
     
@@ -176,7 +165,7 @@ def create_config_manual():
     
     #What table are we using for plot data?
         #Stats, Indiv_Data,Group_Data
-        # If Indiv_Data or Group Data Need to kow how to filter the data such that selecting correct points
+        # If Indiv_Data or Group Data Need to kow how to filter the data such that selecting correct points -- the groups to pull
     
     #What data should be on the x axis?
     
@@ -189,18 +178,25 @@ def create_config_manual():
         #Y,N -> then assign as None
         # if Y then assign the top_amount to the number given and sort_on to myconfig.y
     '''
+    
+    myconfig = Config(use_sheet='stats',x='GN_Symbol',y='percent_change_Young - -_Old - -',groups_to_include=None,config_reducereorder={'top_amount':10,'sort_on':'percent_change_Young - -_Old - -'},config_filter={'pval_BH':0.05,
+                    'source_of_variation':'Age_Class',
+                    'contrast':'fa_mean'})
+    
+    '''
     myconfig.use_sheet='stats'
     myconfig.x='GN_Symbol'#'# ROI'
     myconfig.y='percent_change_Young - -_Old - -'
-    #myconfig.reduce_reorder=None
+    myconfig.groups_to_include=None
     myconfig.reduce_reorder={'top_amount':10,'sort_on':myconfig.y}
     myconfig.filter={'pval_BH':0.05,
                     'source_of_variation':'Age_Class',
-                    'contrast':'fa_mean'}
+                    'contrast':'fa_mean'}    
+    '''
     return myconfig
 
 def create_config_prompt():
-    myconfig = Config
+    myconfig = None
     return myconfig
 
 def plot_by_config(config,Data,Stats):
@@ -251,8 +247,12 @@ def collect_from_data(data,sheet):
     return merged_data
 
 def reduce_to_top(config_reduce,sheet):
-    sheet = sheet.sort_values(by=config_reduce['sort_on'])
+    sheet = sheet.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
     return sheet[0:config_reduce['top_amount']]
+
+def reduce_to_top_Data(config,data):
+    
+    data_pivot = pd.pivot_table(data, values='Value', index='Category', columns='Subcategory')
 
 # Run the Dash app
 if __name__ == '__main__':
