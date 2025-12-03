@@ -14,6 +14,8 @@ import plotly.express as px
 import sqlite3
 import re
 
+#Input and Organize Data Sheets
+
 def set_groupings(data, mode):
     groupings = {} 
     for i,col in enumerate(data.row_description):
@@ -26,6 +28,12 @@ def set_groupings(data, mode):
                 groupings.update({str(data.row_description.index[i]):temp})
     return groupings
 
+class StatsStructure:
+       def __init__(self,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame,groupings:dict):
+        self.row_idx = row_idx
+        self.row_description = row_description
+        self.data = data
+        
 class DataStructure:
        def __init__(self,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame,groupings:dict):
         self.row_idx = row_idx
@@ -56,7 +64,22 @@ def load_data(path,mode):
         
     return myData
 
-Group_Stats = pd.read_csv('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv',delimiter='\t',low_memory=False)
+def load_stats(path):
+    stats = pd.read_csv(path,delimiter='\t',low_memory=False) 
+    stats_col_idx=stats.iloc[0]
+    stats_comments=stats.iloc[1]
+    stats = stats.drop([stats.index[0],stats.index[1]]).reset_index()
+    
+    myStats = StatsStructure
+    #assign data to it
+    
+    myStats.row_idx = stats_col_idx
+    myStats.row_description = stats_comments
+    myStats.data = stats
+    
+    return myStats
+
+Group_Stats = load_stats('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv')
 Group_Data=load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
 Indiv_Data=load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
 
@@ -102,37 +125,99 @@ def update_input_container (run):
 def update_output_container (run,mode):
     config = None
     if mode == 'Manual':
-        config=create_config()
+        config=create_config_manual()
     elif mode == 'Prompt':
-        config = config=create_config()
+        config = config=create_config_prompt()
     if run == 'Yes' and config is not None:
         return plot_by_config(config,Group_Data,Group_Stats)
     else: 
         return None
 class Config: 
-    def __init__(self,x:str,y:str,config_reducereorder:dict,config_filter:dict):
+    def __init__(self,sheetname:str,x:str,y:str,config_reducereorder:dict,config_filter:dict):
+        self.use_sheet = sheetname
         self.x = x
         self.y = y
         self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y)
         self.filter = config_filter #Things applied to the Group Stats data set
 
-def create_config():
+def create_config_manual():
     myconfig = Config
+    
+    '''
+    source_of_variation=
+    
+    dcc.Dropdown(
+            id='select-data',
+            options={'Stats Output': 'stats_output',
+                    'Group Data Table': 'group_data_table',
+                    'Subject Data Table': 'subject_data_table'},
+            value='Select the table you are using to plot data',
+            placeholder='Select the table you are using to plot data',
+        )
+    
+    
+        dcc.Dropdown(
+            id='select-axis-x',
+            options={'Stats Output': 'stats_output',
+                    'Group Data Table': 'group_data_table',
+                    'Subject Data Table': 'subject_data_table'},
+            value='Select the table you are using to plot data',
+            placeholder='Select the table you are using to plot data',
+        )
+        
+        dcc.Dropdown(
+            id='select-axis-y',
+            options={'Stats Output': 'stats_output',
+                    'Group Data Table': 'group_data_table',
+                    'Subject Data Table': 'subject_data_table'},
+            value='Select the table you are using to plot data',
+            placeholder='Select the table you are using to plot data',
+        )
+    
+    #What table are we using for plot data?
+        #Stats, Indiv_Data,Group_Data
+        # If Indiv_Data or Group Data Need to kow how to filter the data such that selecting correct points
+    
+    #What data should be on the x axis?
+    
+    #What data should be on the y axis?
+    
+    #What phenotype and source of variation should be plotted? 
+        #phenotype volume, FA AD RD MD etc, Source f variation (pull from stat sheet)
+    #    
+    #Would you like to reduce the number of entries displayed via a Rank ordering? 
+        #Y,N -> then assign as None
+        # if Y then assign the top_amount to the number given and sort_on to myconfig.y
+    '''
+    myconfig.use_sheet='stats'
     myconfig.x='GN_Symbol'#'# ROI'
     myconfig.y='percent_change_Young - -_Old - -'
+    #myconfig.reduce_reorder=None
     myconfig.reduce_reorder={'top_amount':10,'sort_on':myconfig.y}
     myconfig.filter={'pval_BH':0.05,
                     'source_of_variation':'Age_Class',
                     'contrast':'fa_mean'}
     return myconfig
 
-def create_config_from_prompt():
+def create_config_prompt():
     myconfig = Config
     return myconfig
 
 def plot_by_config(config,Data,Stats):
-    Reduced_Stats=filter_stat_sheet(config.filter,Stats)
-    Reduced_Stats=reduce_to_top(config.reduce_reorder,Reduced_Stats)
+    
+    if config.filter is not None:
+        Reduced_Stats=filter_stat_sheet(config.filter,Stats.data)
+    else: 
+        Reduced_Stats=Stats.data
+        
+    if config.reduce_reorder is not None and config.use_sheet == 'stats':
+        plot_data=reduce_to_top(config.reduce_reorder,Reduced_Stats)
+    elif config.reduce_reorder is not None and config.use_sheet == 'indiv':
+        Reduced_Stats=reduce_to_top(config.reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Indiv_Data,Reduced_Stats)
+    elif config.reduce_reorder is not None and config.use_sheet == 'group':
+        Reduced_Stats=reduce_to_top(config.reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Group_Data,Reduced_Stats)
     
     ## Source - https://stackoverflow.com/a
     # Posted by Jonathan Chow
@@ -140,7 +225,7 @@ def plot_by_config(config,Data,Stats):
     # dcc.Graph(id='my-graph',style={'width': '90vh', 'height': '90vh'}) 
 
     chart = dcc.Graph(id ='output-graph',
-        figure=px.scatter(Reduced_Stats, 
+        figure=px.scatter(plot_data, 
             x=config.x,
             y=config.y,),
         style={'width': '50vw', 'height': '50vh'} )
@@ -163,7 +248,6 @@ def collect_from_data(data,sheet):
         x=re.search(r'(_delete_me)$',col)
         if x: 
             merged_data.drop(columns=col,inplace=True)
-
     return merged_data
 
 def reduce_to_top(config_reduce,sheet):
