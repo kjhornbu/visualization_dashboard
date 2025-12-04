@@ -14,9 +14,9 @@ import plotly.express as px
 import re
 import math
 import time
+import os
 
-#Input and Organize Data Sheets
-
+#Input and Organize Data Tables and Stat Sheets
 def set_groupings(data, mode):
     groupings = {} 
     for i,col in enumerate(data.row_description):
@@ -45,16 +45,15 @@ class DataStructure:
         
 def load_data(path,mode):
     
-    data = pd.read_csv(path,delimiter='\t',low_memory=False,header=1)
+    data = pd.read_csv(path,delimiter='\t',low_memory=False,header=1) #This number gets adjusted depending on how much stuff is in the description of the csv... unsure how we will deal with that in python versus matlab. 
     data_col_idx=data.iloc[0]
     data_comments=data.iloc[1]
     data = data.drop([data.index[0],data.index[1]]).reset_index()
     
     myData=DataStructure(row_idx = data_col_idx,row_description = data_comments,data = data,mode=mode,groupings=None) # Create Data (indiv or Group) class
 
-    #find the groupings within the data
+    #find the groupings within the data and assign
     groupings=set_groupings(myData, mode)
-    
     myData.groupings = groupings
         
     return myData
@@ -70,115 +69,69 @@ def load_stats(path):
     
     return myStats
 
-#Group_Stats = load_stats('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv')
-#Group_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
-#Indiv_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
+#Create a Configuration for Plotting
 
-# Initialize the Dash app
-app = dash.Dash(__name__)
-
-app.layout = html.Div([
-    html.H1(children='Aging BXD Visualization Dashboard', style={'textAlign':'center', 'color':"#91472a", 'font-size':24}),#Include style for title
-     html.Div([
-        html.Label("Dashboard Inputs:"),
-            html.Div([
-                html.Label("Group Stats File Path:"),
-                dcc.Input(id='group_stats_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv'),
-                dcc.Loading(id="loading-1", type="default", children=html.Div(id="loading-group-stats"))
-            ]),
-        html.Div([
-                html.Label("Group Data Table File Path:"),
-                dcc.Input(id='group_data_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv'),
-                dcc.Loading(id="loading-2", type="default", children=html.Div(id="loading-group_data"))
-            ]),
-         html.Div([
-                html.Label("Subject Data Table File Path:"),
-                dcc.Input(id='indiv_data_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv'),
-                dcc.Loading(id="loading-3", type="default", children=html.Div(id="loading-indiv_data"))
-            ]),
-        dcc.Dropdown(
-            id='dropdown-run',
-            options={'Yes': 'Yes',
-                'No':'No'},
-            value='Select to Run',
-            placeholder='Select to Run'
-        )
-    ], style ={'width':'80%', 'font-size':20, 'margin':3}),
-    html.Div(dcc.Dropdown(
-            id='select-mode',
-            options={'Manual': 'Manual',
-                    'Prompt': 'Prompt'},
-            value='Select Mode for Configuration Input',
-            placeholder='Select Mode for Configuration Input',
-        ),style ={'width':'80%', 'font-size':20, 'margin':3}),
-    html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
-])
-
-
-@app.callback(Output("loading-group-stats", "children"),
-    Input(component_id='group_stats_path',component_property='value'))
-def update_input_stats (path):
-    
-    time.sleep(2)
-    global Group_Stats
-    Group_Stats = load_stats(path)
-    
-    return
-
-@app.callback(Output("loading-group_data", "children"),
-    Input(component_id='group_data_path',component_property='value'))
-def update_input_group_data (path):
-    time.sleep(2)
-    global Group_Data
-    Group_Data = load_data(path,mode='group')
-    
-    return
-
-@app.callback(Output("loading-indiv_data", "children"),
-    Input(component_id='indiv_data_path',component_property='value'))
-def update_input_group_data (path):
-    time.sleep(2)
-    global Indiv_Data
-    Indiv_Data = load_data(path,mode='indiv')
-    
-    return
-
-#Start mode callback
-@app.callback(
-    Output(component_id='select-mode', component_property='disabled'),
-    Input(component_id='dropdown-run',component_property='value'))
-
-def update_input_container (run):
-    if run =='No': 
-        return True
-    else: 
-        return False
-
-#start plot callback
-@app.callback(Output(component_id='output-container', component_property='children'),
-             [Input(component_id='dropdown-run',component_property='value'), Input(component_id='select-mode', component_property='value')])
-
-def update_output_container (run,mode):
-    config = None
-    if mode == 'Manual':
-        config=create_config_manual()
-    elif mode == 'Prompt':
-        config = config=create_config_prompt()
-    if run == 'Yes' and config is not None:
-        return plot_by_config(config,Indiv_Data,Group_Data,Group_Stats)
-    else: 
-        return None
-    
 class Config: 
     def __init__(self,use_sheet:str,x:str,y:str,groups_to_include:dict,config_reducereorder:dict,config_filter:dict):
         self.use_sheet = use_sheet
         self.x = x
         self.y = y
         self.groups_to_include=groups_to_include
-        self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y)
+        self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y --- always sort on the Y entry?)
         self.filter = config_filter #Things applied to the Group Stats data set
 
+
+def organize_table_type()
+    set_table_type()
+    get_table_type
+
+    return
+
+def set_table_type()
+
+    get_table=dcc.Dropdown(
+                id='select-data',
+                options={'Stats Output': 'Group Statistical Results',
+                        'Group Data Table': 'group_data_table',
+                        'Subject Data Table': 'subject_data_table'},
+                value='Select the table you are using to plot data',
+                placeholder='Select the table you are using to plot data',
+            )
+    
+     
+    return get_table
+
+def get_table_type()
+
+    return table_type
+
 def create_config_manual():
+    
+    sov_options=list(Group_Stats.data['source_of_variation'].unique())
+    contrast_options=list(Group_Stats.data['contrast'].unique())
+    
+    table_type = organize_table_type()
+    
+    if table_type == 'stats':
+        x_options = list(Group_Stats.data.columns)
+        y_options = list(Group_Stats.data.columns)
+        groups_to_include_options=None
+    elif table_type == "indiv":
+        x_options = list(Indiv_Data.data.columns)
+        y_options = list(Indiv_Data.data.columns)
+        groups_to_include_options = Indiv_Data.groupings
+    elif table_type == "group":
+        x_options = list(Group_Data.data.columns)
+        y_options = list(Group_Data.data.columns)
+        groups_to_include_options = Group_Data.groupings
+        
+        rank_number = int 
+        rank_sort_options= y_options
+        
+        
+        
+        
+    
     '''
     source_of_variation=
     
@@ -230,22 +183,109 @@ def create_config_manual():
                     'source_of_variation':'Age_Class',
                     'contrast':'fa_mean'})
     
-    '''
-    myconfig.use_sheet='stats'
-    myconfig.x='GN_Symbol'#'# ROI'
-    myconfig.y='percent_change_Young - -_Old - -'
-    myconfig.groups_to_include=None
-    myconfig.reduce_reorder={'top_amount':10,'sort_on':myconfig.y}
-    myconfig.filter={'pval_BH':0.05,
-                    'source_of_variation':'Age_Class',
-                    'contrast':'fa_mean'}    
-    '''
     return myconfig
 
 def create_config_prompt():
     myconfig = None
     return myconfig
 
+
+# Initialize the Dash app
+app = dash.Dash(__name__)
+
+app.layout = html.Div([
+    html.H1(children='CIVM Visualization Dashboard', style={'textAlign':'center', 'color':"#012169", 'font-size':24,'font-family':'Arial'}),
+    html.Div([
+        html.Div([
+            html.Label("Group Statistical Results File Path: " , style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
+            dcc.Input(id='group_stats_path', type='text', value=None, placeholder='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv',style={'width': '50%'}),
+            dcc.Loading(id="loading-1", type="default", delay_show=0, delay_hide=500, children=html.Div(id="loading-stat_sheet"))
+        ]),
+        html.Div([
+            html.Label("Group Data Table File Path: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
+            dcc.Input(id='group_data_path', type='text', value=None, placeholder='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',style={'width': '50%'}),
+            dcc.Loading(id="loading-2", type="default", delay_show=0, delay_hide=500, children=html.Div(id="loading-group_data"))
+            ]),
+        html.Div([
+            html.Label("Subject Data Table File Path: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
+            dcc.Input(id='indiv_data_path', type='text', value=None, placeholder='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',style={'width': '50%'}),
+            dcc.Loading(id="loading-3", type="default", delay_show=0, delay_hide=500, children=html.Div(id="loading-indiv_data"))
+            ]),
+    ], style ={'width':'80%','margin':5}),
+    
+    html.Div([dcc.Dropdown(id='dropdown-run',
+        options={'Yes': 'Yes','No':'No'},
+        value='Select to Run',placeholder='Select to Run')]
+             ,style ={'width':'80%', 'font-size':20, 'margin':5}),
+    html.Div([dcc.Dropdown(id='select-mode',
+            options={'Manual': 'Manual','Prompt': 'Prompt'},
+            value='Select Mode for Configuration Input',
+            placeholder='Select Mode for Configuration Input',
+        )],style ={'width':'80%', 'font-size':20, 'margin':5}),
+    html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
+])
+
+#upload all data tables and stats sheets
+@app.callback(Output("loading-stat_sheet", "children"),
+    Input(component_id='group_stats_path',component_property='value'))
+def update_input_stats (path):
+    if path is not None and os.path.exists(path):
+        time.sleep(2)
+        global Group_Stats
+        Group_Stats = load_stats(path)
+        
+        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
+        
+    return
+
+@app.callback(Output("loading-group_data", "children"),
+    Input(component_id='group_data_path',component_property='value'))
+def update_input_group_data (path):
+    if path is not None and os.path.exists(path):
+        time.sleep(1)
+        global Group_Data
+        Group_Data = load_data(path,mode='group')
+        
+        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
+        
+    return
+
+@app.callback(Output("loading-indiv_data", "children"),
+    Input(component_id='indiv_data_path',component_property='value'))
+def update_input_indiv_data (path):   
+    if path is not None and os.path.exists(path): 
+        time.sleep(1)
+        global Indiv_Data
+        Indiv_Data = load_data(path,mode='indiv')
+        
+        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
+        
+    return
+
+#Start Dashboard Generation
+@app.callback(Output(component_id='select-mode', component_property='disabled'),
+    Input(component_id='dropdown-run',component_property='value'))
+def update_input_container (run):
+    if run =='No': 
+        return True
+    else: 
+        return False
+
+#start Plot Callback
+@app.callback(Output(component_id='output-container', component_property='children'),
+             [Input(component_id='dropdown-run',component_property='value'), Input(component_id='select-mode', component_property='value')])
+def update_output_container (run,mode):
+    config = None
+    if mode == 'Manual':
+        config = create_config_manual()
+    elif mode == 'Prompt':
+        config = create_config_prompt()
+    if run == 'Yes' and config is not None:
+        return plot_by_config(config,Indiv_Data,Group_Data,Group_Stats)
+    else: 
+        return None
+
+# filter and plot via the config file
 def plot_by_config(config,Indiv_Data,Group_Data,Stats):
     if config.filter is not None:
         Reduced_Stats=filter_stat_sheet(config.filter,Stats.data)
@@ -273,7 +313,8 @@ def plot_by_config(config,Indiv_Data,Group_Data,Stats):
         style={'width': '50vw', 'height': '50vh'})
     
     return [html.Div(className='chart-item', children=[html.Div(children=chart)])]
-        
+
+#Helper files for creating proper filtering of data table and stat sheet
 def filter_stat_sheet(config_filter,sheet):
     reduced_sheet=sheet 
     for f in config_filter:
