@@ -13,6 +13,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 import re
 import math
+import time
 
 #Input and Organize Data Sheets
 
@@ -69,9 +70,9 @@ def load_stats(path):
     
     return myStats
 
-Group_Stats = load_stats('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv')
-Group_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
-Indiv_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
+#Group_Stats = load_stats('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv')
+#Group_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv',mode='group')
+#Indiv_Data = load_data('/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv',mode='indiv')
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
@@ -80,6 +81,21 @@ app.layout = html.Div([
     html.H1(children='Aging BXD Visualization Dashboard', style={'textAlign':'center', 'color':"#91472a", 'font-size':24}),#Include style for title
      html.Div([
         html.Label("Dashboard Inputs:"),
+            html.Div([
+                html.Label("Group Stats File Path:"),
+                dcc.Input(id='group_stats_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Statistical_Results_Age_Class_Strain_Sex.csv'),
+                dcc.Loading(id="loading-1", type="default", children=html.Div(id="loading-group-stats"))
+            ]),
+        html.Div([
+                html.Label("Group Data Table File Path:"),
+                dcc.Input(id='group_data_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Bilateral/Group_Data_Table_Age_Class_Strain_Sex.csv'),
+                dcc.Loading(id="loading-2", type="default", children=html.Div(id="loading-group_data"))
+            ]),
+         html.Div([
+                html.Label("Subject Data Table File Path:"),
+                dcc.Input(id='indiv_data_path', type='text', value='/Volumes/dusom_civm-kjh60/All_Staff/18.gaj.42/Scalar_and_Volume/Main_Effects_2025_01_14_NoB6/Non_Erode/Subject_Data_Table.csv'),
+                dcc.Loading(id="loading-3", type="default", children=html.Div(id="loading-indiv_data"))
+            ]),
         dcc.Dropdown(
             id='dropdown-run',
             options={'Yes': 'Yes',
@@ -97,6 +113,36 @@ app.layout = html.Div([
         ),style ={'width':'80%', 'font-size':20, 'margin':3}),
     html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
 ])
+
+
+@app.callback(Output("loading-group-stats", "children"),
+    Input(component_id='group_stats_path',component_property='value'))
+def update_input_stats (path):
+    
+    time.sleep(2)
+    global Group_Stats
+    Group_Stats = load_stats(path)
+    
+    return
+
+@app.callback(Output("loading-group_data", "children"),
+    Input(component_id='group_data_path',component_property='value'))
+def update_input_group_data (path):
+    time.sleep(2)
+    global Group_Data
+    Group_Data = load_data(path,mode='group')
+    
+    return
+
+@app.callback(Output("loading-indiv_data", "children"),
+    Input(component_id='indiv_data_path',component_property='value'))
+def update_input_group_data (path):
+    time.sleep(2)
+    global Indiv_Data
+    Indiv_Data = load_data(path,mode='indiv')
+    
+    return
+
 #Start mode callback
 @app.callback(
     Output(component_id='select-mode', component_property='disabled'),
