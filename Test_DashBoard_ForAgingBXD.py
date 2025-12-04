@@ -12,6 +12,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.express as px
 import re
+import math
 
 #Input and Organize Data Sheets
 
@@ -118,7 +119,7 @@ def update_output_container (run,mode):
     elif mode == 'Prompt':
         config = config=create_config_prompt()
     if run == 'Yes' and config is not None:
-        return plot_by_config(config,Group_Data,Group_Stats)
+        return plot_by_config(config,Indiv_Data,Group_Data,Group_Stats)
     else: 
         return None
     
@@ -199,8 +200,7 @@ def create_config_prompt():
     myconfig = None
     return myconfig
 
-def plot_by_config(config,Data,Stats):
-    
+def plot_by_config(config,Indiv_Data,Group_Data,Stats):
     if config.filter is not None:
         Reduced_Stats=filter_stat_sheet(config.filter,Stats.data)
     else: 
@@ -210,10 +210,10 @@ def plot_by_config(config,Data,Stats):
         plot_data=reduce_to_top(config.reduce_reorder,Reduced_Stats)
     elif config.reduce_reorder is not None and config.use_sheet == 'indiv':
         Reduced_Stats=reduce_to_top(config.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Indiv_Data,Reduced_Stats)
+        plot_data=collect_from_data(config,Indiv_Data,Reduced_Stats)
     elif config.reduce_reorder is not None and config.use_sheet == 'group':
         Reduced_Stats=reduce_to_top(config.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Group_Data,Reduced_Stats)
+        plot_data=collect_from_data(config,Group_Data,Reduced_Stats)
     
     ## Source - https://stackoverflow.com/a
     # Posted by Jonathan Chow
@@ -224,7 +224,7 @@ def plot_by_config(config,Data,Stats):
         figure=px.scatter(plot_data, 
             x=config.x,
             y=config.y,),
-        style={'width': '50vw', 'height': '50vh'} )
+        style={'width': '50vw', 'height': '50vh'})
     
     return [html.Div(className='chart-item', children=[html.Div(children=chart)])]
         
@@ -237,8 +237,8 @@ def filter_stat_sheet(config_filter,sheet):
             reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]
     return reduced_sheet
 
-def collect_from_data(data,sheet):
-    merged_data = pd.merge(sheet, data, on='GN_Symbol', how='inner',copy=False,suffixes= ("", "_delete_me"))
+def collect_from_data(config,data,sheet):
+    merged_data = pd.merge(sheet, data, on=config.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
     col_names=merged_data.columns
     for col in col_names:
         x=re.search(r'(_delete_me)$',col)
@@ -250,9 +250,19 @@ def reduce_to_top(config_reduce,sheet):
     sheet = sheet.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
     return sheet[0:config_reduce['top_amount']]
 
-def reduce_to_top_Data(config,data):
+def reduce_to_top_Data(config,data):  
+    data_pivot = pd.pivot_table(Group_Data.data, values=config.y, index=config.x, columns=list(Group_Data.groupings.keys()))
     
-    data_pivot = pd.pivot_table(data, values='Value', index='Category', columns='Subcategory')
+    # we want to do a pairwise comparison of 
+    for group_include in config.groups_to_include:
+        data_pivot
+    
+    result = math.comb(n, k)
+    # Do comparision to make sure we are considering all the comparisons to include in the graph. what has most to least. 
+    config.reduce_reorder['top_amount']
+    data[0:config.reduce_reorder['top_amount']]
+    
+    return 
 
 # Run the Dash app
 if __name__ == '__main__':
