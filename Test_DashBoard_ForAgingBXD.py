@@ -81,41 +81,18 @@ class Config:
         self.filter = config_filter #Things applied to the Group Stats data set
 
 
-def organize_table_type()
-    set_table_type()
-    get_table_type
-
-    return
-
-def set_table_type()
-
-    get_table=dcc.Dropdown(
-                id='select-data',
-                options={'Stats Output': 'Group Statistical Results',
-                        'Group Data Table': 'group_data_table',
-                        'Subject Data Table': 'subject_data_table'},
-                value='Select the table you are using to plot data',
-                placeholder='Select the table you are using to plot data',
-            )
-    
-     
-    return get_table
-
-def get_table_type()
-
-    return table_type
-
 def create_config_manual():
     
     sov_options=list(Group_Stats.data['source_of_variation'].unique())
     contrast_options=list(Group_Stats.data['contrast'].unique())
     
-    table_type = organize_table_type()
-    
+    #table_type = organize_table_type()
+    table_type='stats'
     if table_type == 'stats':
         x_options = list(Group_Stats.data.columns)
         y_options = list(Group_Stats.data.columns)
         groups_to_include_options=None
+        
     elif table_type == "indiv":
         x_options = list(Indiv_Data.data.columns)
         y_options = list(Indiv_Data.data.columns)
@@ -127,10 +104,7 @@ def create_config_manual():
         
         rank_number = int 
         rank_sort_options= y_options
-        
-        
-        
-        
+            
     
     '''
     source_of_variation=
@@ -222,6 +196,7 @@ app.layout = html.Div([
             value='Select Mode for Configuration Input',
             placeholder='Select Mode for Configuration Input',
         )],style ={'width':'80%', 'font-size':20, 'margin':5}),
+    html.Div([html.Div(id='table_select-container', style ={'width':'80%', 'font-size':20, 'margin':5}),]),
     html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
 ])
 
@@ -284,7 +259,7 @@ def update_output_container (run,mode):
         return plot_by_config(config,Indiv_Data,Group_Data,Group_Stats)
     else: 
         return None
-
+    
 # filter and plot via the config file
 def plot_by_config(config,Indiv_Data,Group_Data,Stats):
     if config.filter is not None:
