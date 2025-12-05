@@ -80,6 +80,9 @@ class Config:
         self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y --- always sort on the Y entry?)
         self.filter = config_filter #Things applied to the Group Stats data set
 
+def organize_table_type():
+    table_type=dcc.Dropdown(options={'stats':'Group Statistical Results','group':'Group Data Table','indiv': 'Subject Data Table'},placeholder='Select Main Visualization Table', id='table_options')
+    return table_type
 
 def create_config_manual():
     
@@ -163,7 +166,6 @@ def create_config_prompt():
     myconfig = None
     return myconfig
 
-
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
@@ -190,16 +192,15 @@ app.layout = html.Div([
     html.Div([dcc.Dropdown(id='dropdown-run',
         options={'Yes': 'Yes','No':'No'},
         value='Select to Run',placeholder='Select to Run')]
-             ,style ={'width':'80%', 'font-size':20, 'margin':5}),
+             ,style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
     html.Div([dcc.Dropdown(id='select-mode',
             options={'Manual': 'Manual','Prompt': 'Prompt'},
             value='Select Mode for Configuration Input',
             placeholder='Select Mode for Configuration Input',
-        )],style ={'width':'80%', 'font-size':20, 'margin':5}),
+        )],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
     html.Div([html.Div(id='table_select-container', style ={'width':'80%', 'font-size':20, 'margin':5}),]),
     html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
 ])
-
 #upload all data tables and stats sheets
 @app.callback(Output("loading-stat_sheet", "children"),
     Input(component_id='group_stats_path',component_property='value'))
@@ -253,6 +254,7 @@ def update_output_container (run,mode):
     config = None
     if mode == 'Manual':
         config = create_config_manual()
+        
     elif mode == 'Prompt':
         config = create_config_prompt()
     if run == 'Yes' and config is not None:
@@ -313,6 +315,7 @@ def reduce_to_top(config_reduce,sheet):
     return sheet[0:config_reduce['top_amount']]
 
 def reduce_to_top_Data(config,data):  
+    ## To do not yet actually filtering the data based on teh comparisons provided
     data_pivot = pd.pivot_table(Group_Data.data, values=config.y, index=config.x, columns=list(Group_Data.groupings.keys()))
     
     # we want to do a pairwise comparison of 
@@ -325,7 +328,37 @@ def reduce_to_top_Data(config,data):
     data[0:config.reduce_reorder['top_amount']]
     
     return 
+def define_group_inputs_to_plot(group_dict):
+    
+    group_inputs
+    
+    return group_inputs
+def make_axis_input(data_options,id_name):
+    value_name= f"Select Data for {id_name}-axis"
+    placeholder_name=f"Select Data for {id_name}-axis"
+    dropdown = dcc.Dropdown(id=id_name,
+            options=data_options,
+            value=value_name,
+            placeholder=placeholder_name,
+        )
+    return dropdown
 
+def make_radiobutton_pvalue():
+    radio=dcc.RadioItems([{label:'NONE', value:None},{label:'p-value', value: 'pval'},{label:'p-value with BH', value: 'pval_BH'}], 'NONE', inline=True, id='radio_pval')
+    return radio
+
+def make_radiobutton_topN():
+    radio=dcc.RadioItems(['ALL', 'TOP 10','TOP 20'], 'TOP 10', inline=True,id='radio_top')
+    return radio
+
+def make_slider(slider_input,id_name):
+    slider_dict={}
+    for i in range(len(slider_input)):
+        slider_dict.update({i:slider_input[i]})
+    slider=dcc.Slider(0, len(slider_input),marks=slider_dict, value=0, id=id_name)
+    #either use'contrast_slider' or 'source_slider'
+    return slider
+            
 # Run the Dash app
 if __name__ == '__main__':
     app.run(debug=True)
