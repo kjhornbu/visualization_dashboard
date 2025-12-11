@@ -219,7 +219,7 @@ def full_fig_layout(select_table_4_plotting):
     drop_x=make_axis_input(x_options,'x') # DCC
     drop_y=make_axis_input(y_options,'y') #DCC
             
-    fig_layout_top = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
+    fig_layout_top = [html.Div(children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
     
