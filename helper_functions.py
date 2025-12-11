@@ -31,7 +31,6 @@ def check_header_rows(path):
 
 def load_data(path,mode):
     header_num=check_header_rows(path)
-    print(header_num)
     data = pd.read_csv(path,delimiter='\t',low_memory=False,header=header_num)
     data_col_idx=data.iloc[0]
     data_comments=data.iloc[1]
@@ -176,7 +175,7 @@ def generate_config(select_table_type,selected_radioPval,selected_radioTopN,sele
         selected_sov=None
 
     elif select_table_type == "group":
-        selected_contrast=Nonem
+        selected_contrast=None
         selected_sov=None
 
     myPlotConfig = PlotConfig(use_sheet=select_table_type,x=selected_x,y=selected_y,groups_to_include=selected_groups_to_include,config_reducereorder={'top_amount':selected_radioTopN,'sort_on':selected_y},config_filter={set_pval:set_pval_value,
@@ -189,6 +188,7 @@ def full_fig_layout(select_table_4_plotting):
     #we need to know at least what table we are plotting from to be able to setup the full layout of the figure which then we query to setup the configuration
     radioPval=make_radiobutton_pvalue()# DCC
     radioTopN=make_radiobutton_topN()# DCC
+    
     if select_table_4_plotting == 'stats':
         x_options = list(persistentData.Group_Stats.data.columns)
         y_options = list(persistentData.Group_Stats.data.columns)
@@ -198,46 +198,41 @@ def full_fig_layout(select_table_4_plotting):
 
         slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider') #DCC
         slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider') #DCC
+        
+        fig_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid'})]
+        
+    else: 
 
-        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
+        if select_table_4_plotting == 'indiv':
+            x_options = list(persistentData.Indiv_Data.data.columns)
+            y_options = list(persistentData.Indiv_Data.data.columns)
+
+            drop_x=make_axis_input(x_options,'x') # DCC
+            drop_y=make_axis_input(y_options,'y') #DCC
+
+            groups_to_include_options = persistentData.Indiv_Data.groupings
+
+            group_datatable=make_grouping_selector(groups_to_include_options)#DCC
+
+        elif select_table_4_plotting == 'group':
+            x_options = list(Group_Data.data.columns)
+            y_options = list(Group_Data.data.columns)
+
+            drop_x=make_axis_input(x_options,'x') # DCC
+            drop_y=make_axis_input(y_options,'y') #DCC
+
+            groups_to_include_options = Group_Data.groupings
+
+            #group_datatable=make_grouping_selector(groups_to_include_options)#DCC
+
+        #fig_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid'})]
+
+    fig_layout_top = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
-
-    elif select_table_4_plotting == 'indiv':
-        x_options = list(persistentData.Indiv_Data.data.columns)
-        y_options = list(persistentData.Indiv_Data.data.columns)
-
-        drop_x=make_axis_input(x_options,'x') # DCC
-        drop_y=make_axis_input(y_options,'y') #DCC
-
-        groups_to_include_options = persistentData.Indiv_Data.groupings
-
-        group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-        slider_contrast=None
-        slider_sov=None
-
-        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
-
-    elif select_table_4_plotting == 'group':
-        x_options = list(Group_Data.data.columns)
-        y_options = list(Group_Data.data.columns)
-
-        drop_x=make_axis_input(x_options,'x') # DCC
-        drop_y=make_axis_input(y_options,'y') #DCC
-
-        groups_to_include_options = Group_Data.groupings
-
-        group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-        slider_contrast=None
-        slider_sov=None
-
-        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
-
+    
+    
+    fig_layout=fig_layout_top
+    
     return fig_layout

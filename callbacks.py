@@ -14,12 +14,9 @@ import persistentData
 @callback(Output("loading-stat_sheet", "children"),
     Input(component_id='group_stats_path',component_property='value'))
 def update_input_stats (path):
-    print(path)
     if path is not None and os.path.exists(path):
         time.sleep(1)
-        print(path)
         persistentData.Group_Stats = load_stats(path)
-        print(f'LOADED GROUP STATS {path}')
     return
 
 @callback(Output("loading-group_data", "children"),
@@ -28,7 +25,6 @@ def update_input_group_data (path):
     if path is not None and os.path.exists(path):
         time.sleep(1)
         persistentData.Group_Data = load_data(path,mode='group')
-        print(f'LOADED GROUP DATA {path}')
     return
 
 @callback(Output("loading-indiv_data", "children"),
@@ -37,7 +33,6 @@ def update_input_indiv_data (path):
     if path is not None and os.path.exists(path):
         time.sleep(1)
         persistentData.Indiv_Data = load_data(path,mode='indiv')
-        print(f'LOADED INDIV DATA {path}')
     return
 
 @callback(
@@ -65,25 +60,28 @@ def set_figure_to_output_Prompt(prompt_text):
     #push that to the configuration generation
     #apply that to the figure
     #push that to the output container
-    print(persistentData.Indiv_Data)
-    print(persistentData.Group_Data)
-    print(persistentData.Group_Stats)
+
     if isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
-        return full_fig_layout(select_table_4_plotting)
+        return None
     else:
         return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Prompt", value=message))])]
     return None
 
 ## Have to have the config to do the config and that is screwing with me. The actual configuration setup needs a ton of selection points or at least set data....
 #start Plot Callback
-@callback(Output(component_id='output-container', component_property='children', allow_duplicate=True),[Input(component_id='main_plot_table',component_property='value')],prevent_initial_call=True)
+@callback(Output(component_id='output-container', component_property='children', allow_duplicate=True),Input(component_id='main_plot_table',component_property='value'),prevent_initial_call=True)
 def set_figure_to_output_Manual(select_table_4_plotting):
     message= 'Make Sure All Data Files Are Loaded and Exist At Path Location'
-    myConfig=generate_config()
+    #myConfig=generate_config()
     # cheesy method to hold onto configs, see persistentData for the name of our "global-ish" variables.o
-    Plot_Configurations["myConfig"]=myConfig
-
-    if isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
+    
+    myConfig = PlotConfig(use_sheet='stats',x='GN_Symbol',y='percent_change_Young - -_Old - -',groups_to_include=None,config_reducereorder={'top_amount':10,'sort_on':'percent_change_Young - -_Old - -'},config_filter={'pval_BH':0.05,
+                    'source_of_variation':'Age_Class',
+                    'contrast':'fa_mean'})
+    
+    persistentData.Plot_Configurations["myConfig"]=myConfig
+    
+    if select_table_4_plotting is not None and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
         return full_fig_layout(select_table_4_plotting)
     else:
         return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message))])]
