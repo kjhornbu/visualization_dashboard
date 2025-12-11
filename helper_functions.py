@@ -193,9 +193,6 @@ def full_fig_layout(select_table_4_plotting):
         x_options = list(persistentData.Group_Stats.data.columns)
         y_options = list(persistentData.Group_Stats.data.columns)
 
-        drop_x=make_axis_input(x_options,'x') # DCC
-        drop_y=make_axis_input(y_options,'y') #DCC
-
         slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider') #DCC
         slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider') #DCC
         
@@ -207,27 +204,21 @@ def full_fig_layout(select_table_4_plotting):
         if select_table_4_plotting == 'indiv':
             x_options = list(persistentData.Indiv_Data.data.columns)
             y_options = list(persistentData.Indiv_Data.data.columns)
-
-            drop_x=make_axis_input(x_options,'x') # DCC
-            drop_y=make_axis_input(y_options,'y') #DCC
-
+   
             groups_to_include_options = persistentData.Indiv_Data.groupings
 
-            group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-
         elif select_table_4_plotting == 'group':
-            x_options = list(Group_Data.data.columns)
-            y_options = list(Group_Data.data.columns)
+            x_options = list(persistentData.Group_Data.data.columns)
+            y_options = list(persistentData.Group_Data.data.columns)
 
-            drop_x=make_axis_input(x_options,'x') # DCC
-            drop_y=make_axis_input(y_options,'y') #DCC
-
-            groups_to_include_options = Group_Data.groupings
-
-            #group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-
+            groups_to_include_options = persistentData.Group_Data.groupings
+            
+        #group_datatable=make_grouping_selector(groups_to_include_options)#DCC
         #fig_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid'})]
 
+    drop_x=make_axis_input(x_options,'x') # DCC
+    drop_y=make_axis_input(y_options,'y') #DCC
+            
     fig_layout_top = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
                 html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
