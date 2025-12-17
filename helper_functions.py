@@ -2,13 +2,12 @@
 
 from dash import Dash,dcc, html, dash_table, Input, Output
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import re
 import math
 from classes import *
-#from persistentData import Indiv_Data, Group_Data, Group_Stats
 import persistentData
-
 
 ## HELPER FUNCTIONS FOR DATA I/O
 def check_header_rows(path):
@@ -23,7 +22,6 @@ def check_header_rows(path):
                 if x:
                     header_num=n
         n=n+1
-
         if n>nrows_load_max:
             return None
 
@@ -37,7 +35,6 @@ def load_data(path,mode):
     data = data.drop([data.index[0],data.index[1]]).reset_index()
 
     myData=DataStructure(row_idx = data_col_idx,row_description = data_comments,data = data,mode=mode) # Create Data (indiv or Group) class
-
     return myData
 
 def load_stats(path):
@@ -48,47 +45,15 @@ def load_stats(path):
     stats = stats.drop([stats.index[0],stats.index[1]]).reset_index()
 
     myStats = StatsStructure(row_idx = stats_col_idx,row_description = stats_comments,data = stats)
-
     return myStats
 
 ## MODIFICTIONS TO DATA BASED ON FILTER TYPE AND OTHER CRITERIA
-def use_config_on_Data():
-    #main user of config
-    if myPlotConfig.filter is not None:
-        Reduced_Stats=filter_stat_sheet(myPlotConfig.filter,persistentData.Group_Stats.data)
-    else:
-        Reduced_Stats=persistentData.Group_Stats.data
-
-    if  myPlotConfig.use_sheet == 'stats':
-        plot_data=reduce_to_top(myPlotConfig.reduce_reorder,Reduced_Stats)
-    elif myPlotConfig.use_sheet == 'indiv':
-        Reduced_Stats=reduce_to_top(myPlotConfig.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Reduced_Stats)
-    elif myPlotConfig.use_sheet == 'group':
-        Reduced_Stats=reduce_to_top(myPlotConfig.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Reduced_Stats)
-
-    return plot_data
-
-#Helper files for creating proper filtering of data table and stat sheet
-def filter_stat_sheet(config_filter,sheet):
-    reduced_sheet=sheet
-
-    for f in config_filter:
-        if config_filter[f] is not None: # if is none in entry then we are not filtering based on that
-            if f =='pval' or f =='pval_BH':
-                reduced_sheet = reduced_sheet[reduced_sheet[f] < config_filter[f]]
-            else:
-                reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]
-    return reduced_sheet
-
 def collect_from_data(sheet):
     # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
-    if myPlotConfig.use_sheet == 'group':
-        merged_data = pd.merge(sheet, persistentData.Group_Data, on=myPlotConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
-    elif myPlotConfig.use_sheet =='indiv':
-        merged_data = pd.merge(sheet, persistentData.Indiv_Data, on=myPlotConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
-
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+        merged_data = pd.merge(sheet, persistentData.Group_Data, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
+        merged_data = pd.merge(sheet, persistentData.Indiv_Data, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
     col_names=merged_data.columns
     for col in col_names:
         x=re.search(r'(_delete_me)$',col)
@@ -96,20 +61,51 @@ def collect_from_data(sheet):
             merged_data.drop(columns=col,inplace=True)
     return merged_data
 
-def reduce_to_top(config_reduce,sheet):
-    if config_reduce['top_amount']=='ALL':
-        return sheet
+def filter_stat_sheet(config_filter,sheet):
+    reduced_sheet=sheet
+    for f in config_filter:
+        x=isinstance(config_filter[f], dict)
+        if config_filter[f] is not None and not x: # if is none in entry then we are not filtering based on that
+            if f =='pval' or f =='pval_BH':
+                reduced_sheet = reduced_sheet[reduced_sheet[f] < config_filter[f]]
+            else:
+                reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]          
+    return reduced_sheet
+
+def use_config_on_Data():
+    #main user of config
+    if persistentData.Plot_Configurations["myConfig"].filter is not None:
+        Reduced_Stats=filter_stat_sheet(persistentData.Plot_Configurations["myConfig"].filter,persistentData.Group_Stats.data)
     else:
-        # Sort the reduced sheet on some sorting condition and return the top N (the sorting considered absolutes in conditioning)
-        sheet = sheet.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
-        return sheet[0:config_reduce['top_amount']]
+        Reduced_Stats=persistentData.Group_Stats.data
+      
+    if  persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+        plot_data=reduce_to_top(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+        Reduced_Stats=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats)
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+        Reduced_Stats=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats)
+    return plot_data
+
+#Helper files for creating proper filtering of data table and stat sheet
+def reduce_to_top(config_reduce,Reduced_Stats):
+    if config_reduce['top_amount'] == 'None':
+        return Reduced_Stats
+    elif config_reduce['top_amount'] == 'All':
+        Reduced_Stats = Reduced_Stats.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
+        return Reduced_Stats
+    else:
+        Reduced_Stats = Reduced_Stats.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
+        return Reduced_Stats[0:int(config_reduce['top_amount'])]
 
 def reduce_to_top_Data():
     ## To do not yet actually filtering the data based on the comparisons provided
-    if myPlotConfig.use_sheet == 'group':
-        data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=myPlotConfig.y, index=myPlotConfig.x, columns=list(persistentData.Group_Data.groupings.keys()))
-    elif myPlotConfig.use_sheet =='indiv':
-        data_pivot = pd.pivot_table(persistentData.Indiv_Data.data, values=myPlotConfig.y, index=myPlotConfig.x, columns=list(persistentData.Indiv_Data.groupings.keys()))
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+        data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
+        data_pivot = pd.pivot_table(persistentData.Indiv_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Indiv_Data.groupings.keys()))
 
     # we want to do a pairwise comparison of
     for group_include in config.groups_to_include:
@@ -117,8 +113,8 @@ def reduce_to_top_Data():
 
     result = math.comb(n, k)
     # Do comparision to make sure we are considering all the comparisons to include in the graph. what has most to least. -- doesn't work currently
-    myPlotConfig.reduce_reorder['top_amount']
-    data[0:myPlotConfig.reduce_reorder['top_amount']]
+    persistentData.Plot_Configurations["myConfig"].reduce_reorder['top_amount']
+    data[0:persistentData.Plot_Configurations["myConfig"].reduce_reorder['top_amount']]
 
     return
 
@@ -130,100 +126,104 @@ def make_axis_input(data_options,id_name):
     dropdown = dcc.Dropdown(id=id_name,
             options=data_options,
             value=value_name,
-            placeholder=placeholder_name,
-        )
+            placeholder=placeholder_name)
     return dropdown
 
 def make_radiobutton_pvalue():
-    radio=dcc.RadioItems(options={'NONE':'NONE','p-value':'pval','p-value with BH':'pval_BH'}, value='NONE', inline=True, id='radio_pval')
+    radio=html.Div([html.Label("Filter by Significance:  ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(options={'NONE':'NONE','pval':'p-value','pval_BH':'p-value with BH correction'}, inline=True, id='radio_pval')])
     return radio
 
 def make_radiobutton_topN():
-    radio=dcc.RadioItems(['ALL', 'TOP 10','TOP 20'], 'TOP 10', inline=True,id='radio_top')
+    radio=html.Div([html.Label("Select X-Axis Windowing: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'None':'All without Sorting','All':'All Sorted',10:'TOP 10',20:'TOP 20'}, inline=True,id='radio_TopN')])
     return radio
 
 def make_chart(plot_data):
-    chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=myPlotConfig.x, y=myPlotConfig.y,),style={'width': '50vw', 'height': '50vh'})
+    chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y,),style={'width': '50vw', 'height': '50vh'})
     return chart
 
-def make_slider(slider_input,id_name):
+def make_slider(slider_input,id_name,label):
     slider_dict={}
     for i in range(len(slider_input)):
-        slider_dict.update({i:slider_input[i]})
-    slider=dcc.Slider(0, len(slider_input),marks=slider_dict, value=0, id=id_name)
+        slider_dict.update({slider_input[i]:slider_input[i]})   
+    slider=html.Div([html.Label(label, style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(slider_dict,inline=True,id=id_name)])
     return slider
 
-def make_grouping_selector(groups_to_include_options):
-    group_datatable=dash_table.DataTable()
+def make_grouping_selector(groups_to_include):
+    columns=list(groups_to_include.keys())
+    
+    group_data={}
+    data_length=1
+    for i in range(len(columns)):
+        data_length=len(groups_to_include[columns[i]])*data_length
+    
+    for i in range(data_length):
+        temp_data={}
+        for i in range(len(columns)):
+               temp_data.update()
+                
+        group_data.append(temp_data)
+    
+    group_datatable=dash_table.DataTable(id='group_selections')#data=,row_selectable='multi')
     return group_datatable
 
-#Need the call back here to actually run the config manual generator
-def generate_config(select_table_type,selected_radioPval,selected_radioTopN,selected_contrast,selected_sov,selected_x,selected_y,selected_groups_to_include):
+def make_go_button():
+    button=html.Button('Plot Graph', id='go_button', n_clicks=0)
+    return button
 
-    if selected_radioPval=='NONE':
-        set_pval='pval'
-        set_pval_value=None
-    else:
-        set_pval=selected_radioPval
-        set_pval_value=0.05
-
-    if select_table_type == 'stats':
-        selected_groups_to_include=None
-
-    elif select_table_type == "indiv":
-        selected_contrast=None
-        selected_sov=None
-
-    elif select_table_type == "group":
-        selected_contrast=None
-        selected_sov=None
-
-    myPlotConfig = PlotConfig(use_sheet=select_table_type,x=selected_x,y=selected_y,groups_to_include=selected_groups_to_include,config_reducereorder={'top_amount':selected_radioTopN,'sort_on':selected_y},config_filter={set_pval:set_pval_value,
-                    'source_of_variation':selected_sov,
-                    'contrast':selected_contrast})
-    return myPlotConfig
-
-## THE FULL FIGURE LAYOUT
-def full_fig_layout(select_table_4_plotting):
-    #we need to know at least what table we are plotting from to be able to setup the full layout of the figure which then we query to setup the configuration
-    radioPval=make_radiobutton_pvalue()# DCC
-    radioTopN=make_radiobutton_topN()# DCC
+def top_config_input():
+    radioPval=make_radiobutton_pvalue() #DCC
+    radioTopN=make_radiobutton_topN() #DCC
     
-    if select_table_4_plotting == 'stats':
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         x_options = list(persistentData.Group_Stats.data.columns)
         y_options = list(persistentData.Group_Stats.data.columns)
-
-        slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider') #DCC
-        slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider') #DCC
-        
-        fig_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid'})]
-        
     else: 
-
-        if select_table_4_plotting == 'indiv':
+        if persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
             x_options = list(persistentData.Indiv_Data.data.columns)
             y_options = list(persistentData.Indiv_Data.data.columns)
-   
-            groups_to_include_options = persistentData.Indiv_Data.groupings
 
-        elif select_table_4_plotting == 'group':
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
             x_options = list(persistentData.Group_Data.data.columns)
             y_options = list(persistentData.Group_Data.data.columns)
-
-            groups_to_include_options = persistentData.Group_Data.groupings
-            
-        #group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-        #fig_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid'})]
-
-    drop_x=make_axis_input(x_options,'x') # DCC
+        
+    drop_x=make_axis_input(x_options,'x') #DCC
     drop_y=make_axis_input(y_options,'y') #DCC
             
-    fig_layout_top = [html.Div(children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
-                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
+    config_layout_top = [
+                html.Div(className='chart-item', children=[html.Div(children=drop_x)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=drop_y)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid','width': '100%'})]
     
-    
-    fig_layout=fig_layout_top
-    
+    fig_layout=html.Div(className='chart-item', children=config_layout_top,id='config_top')
     return fig_layout
+
+def bottom_config_input():
+    plot_the_fig=make_go_button() #DCC
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+        slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options: ") #DCC
+        slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options: ") #DCC
+        
+        config_layout_bottom = [
+            html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
+            html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid','width': '100%'}),
+            html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
+    else: 
+        if persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+            groups_to_include_options = persistentData.Indiv_Data.groupings
+
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+            groups_to_include_options = persistentData.Group_Data.groupings
+            
+        group_datatable=make_grouping_selector(groups_to_include_options)#DCC
+        config_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
+                            html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
+    
+    fig_layout=html.Div(className='chart-item', children=config_layout_bottom,id='config_bottom')
+    return fig_layout
+
+## THE FULL Config Input layout
+def full_figure_input():
+    top_layout=top_config_input()
+    bottom_layout=bottom_config_input()
+    return [html.Div(className='chart-item', children=top_layout),html.Div(className='chart-item', children=bottom_layout)]

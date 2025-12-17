@@ -7,7 +7,7 @@ I think these will end up being shared between multiple users at the same time, 
 
 """
 import os
-
+from classes import *
 
 Indiv_Data='We'
 Group_Data='R'
@@ -47,3 +47,5 @@ default_files={"Subject": itab,
              "Group": gtab,
              "Result": rtab,
              }
+
+Plot_Configurations["myConfig"]=PlotConfig()

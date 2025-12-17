@@ -46,8 +46,9 @@ app.layout = html.Div([
             placeholder='Select Mode for Configuration Input',
         )],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
         html.Div([html.Div(id='prompt-container')],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
+        html.Div([html.Div(id='prompt-knobs-container')],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
     ],id='config-container'),
-    html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'})])
+    html.Div([html.Div(id='output-container', className='chart-grid')])
 ],id='main-container')
     
     ## RUN THE DASH APP
