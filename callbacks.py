@@ -115,14 +115,29 @@ def make_graph(isgo):
         return chart
     else:
         return None
+    
+@callback(
+    Output('group_selection_table', 'data'),
+    Input('add-rows-button', 'n_clicks'),
+    State('group_selection_table', 'data'),
+    State('group_selection_table', 'columns'))
+def add_row(n_clicks, rows, columns):
+    if n_clicks > 0:
+        rows.append({c['id']: '-' for c in columns})
+    return rows
 
+@callback(Input('group_selection_table', 'data'),Input('group_selection_table', 'columns'))
+def get_desired_grouping(rows, columns):
+    persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
+    return
+    
 ## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS    
 @callback(Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),Input(component_id='main_plot_table',component_property='value'),prevent_initial_call=True)
 def set_figure_to_output_Manual(select_table_4_plotting):
     #myConfig = PlotConfig(use_sheet='stats',x='GN_Symbol',y='percent_change_Young - -_Old - -',groups_to_include=None,config_reducereorder={'top_amount':10,'sort_on':'percent_change_Young - -_Old - -'},config_filter={'pval_BH':0.05,'source_of_variation':'Age_Class','contrast':'fa_mean'})
     persistentData.Plot_Configurations["myConfig"].use_sheet=select_table_4_plotting
     if persistentData.Plot_Configurations["myConfig"].use_sheet is not None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
-        return full_figure_input()
+        return full_figure_config_input()
     elif persistentData.Plot_Configurations["myConfig"].use_sheet is None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
         message= 'Make sure to --  "Select Main Table for Visualization"'
         return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
