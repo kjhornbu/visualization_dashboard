@@ -100,11 +100,11 @@ def get_sov_slider(sov_value):
     persistentData.Plot_Configurations["myConfig"].filter['source_of_variation']=sov_value
     return
 
-@callback(Input(component_id='group_selections', component_property='value'))
-def get_grouping_selector(groups_to_include):
-    persistentData.Plot_Configurations["myConfig"].groups_to_include=groups_to_include
-    return
 
+@callback(Input('group_selection_table', 'data'),Input('group_selection_table', 'columns'))
+def get_desired_grouping(rows, columns):
+    persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
+    return
 ## Have to have the config to do the config and that is screwing with me. The actual configuration setup needs a ton of selection points or at least set data....
 #start Plot Callback
 @callback(Output(component_id='output-container',component_property='children'),Input(component_id='go_button',component_property='n_clicks'),prevent_initial_call=True) #this needs to be of the top or bottom container
@@ -116,6 +116,10 @@ def make_graph(isgo):
     else:
         return None
     
+@callback(Input(component_id='group_selections', component_property='value'))
+def get_grouping_selector(groups_to_include):
+    persistentData.Plot_Configurations["myConfig"].groups_to_include=groups_to_include
+    return
 @callback(
     Output('group_selection_table', 'data'),
     Input('add-rows-button', 'n_clicks'),
@@ -126,11 +130,6 @@ def add_row(n_clicks, rows, columns):
         rows.append({c['id']: '-' for c in columns})
     return rows
 
-@callback(Input('group_selection_table', 'data'),Input('group_selection_table', 'columns'))
-def get_desired_grouping(rows, columns):
-    persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
-    return
-    
 ## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS    
 @callback(Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),Input(component_id='main_plot_table',component_property='value'),prevent_initial_call=True)
 def set_figure_to_output_Manual(select_table_4_plotting):
