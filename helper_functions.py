@@ -48,13 +48,23 @@ def load_stats(path):
     return myStats
 
 ## MODIFICTIONS TO DATA BASED ON FILTER TYPE AND OTHER CRITERIA
-def collect_from_data(sheet):
+def collect_from_data(sheet,data_playwith):
+    series=sheet[persistentData.Plot_Configurations["myConfig"].x]
+    series_name=[]
+    for n in range(0,len(data_playwith.columns[0])):
+        if n==0:
+            series_name.append(series.name)
+        else:
+            series_name.append('')
+    
+    series.name=tuple(series_name)
     # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
-        merged_data = pd.merge(sheet, persistentData.Group_Data, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
+        merged_data = pd.merge(series, data_playwith, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
     elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
-        merged_data = pd.merge(sheet, persistentData.Indiv_Data, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
+        merged_data = pd.merge(series, data_playwith, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False,suffixes= ("", "_delete_me"))
     col_names=merged_data.columns
+    print(merged_data)
     for col in col_names:
         x=re.search(r'(_delete_me)$',col)
         if x:
@@ -74,7 +84,7 @@ def filter_stat_sheet(config_filter,sheet):
 
 def use_config_on_Data():
     #main user of config
-    if persistentData.Plot_Configurations["myConfig"].filter is not None and persistentData.Plot_Configurations["myConfig"].filter['contrast'] is not None and persistentData.Plot_Configurations["myConfig"].filter['source of variation'] is not None:
+    if persistentData.Plot_Configurations["myConfig"].filter is not None and persistentData.Plot_Configurations["myConfig"].filter['contrast'] is not None and persistentData.Plot_Configurations["myConfig"].filter['source_of_variation'] is not None:
         Reduced_Stats=filter_stat_sheet(persistentData.Plot_Configurations["myConfig"].filter,persistentData.Group_Stats.data)
     else:  
         Reduced_Stats=persistentData.Group_Stats.data
@@ -83,10 +93,10 @@ def use_config_on_Data():
         plot_data=reduce_to_top(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
     elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
         data_playwith=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder)
-        plot_data=collect_from_data(Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats,data_playwith)
     elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
         data_playwith=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder)
-        plot_data=collect_from_data(Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats,data_playwith)
     return plot_data
 
 #Helper files for creating proper filtering of data table and stat sheet
@@ -118,15 +128,12 @@ def reduce_to_top_Data(config_reduce):
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
 
     if config_reduce['top_amount'] == 'None':
-        print(data_playwith)
         return data_playwith
     elif config_reduce['top_amount'] == 'All':
         data_playwith = data_playwith.sort_values(by='sorting_column',key=abs,ascending=False)
-        print(data_playwith)
         return data_playwith
     else:
         data_playwith = data_playwith.sort_values(by='sorting_column',key=abs,ascending=False)
-        print(data_playwith)
         return data_playwith[0:int(config_reduce['top_amount'])]
     
 ## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
@@ -199,15 +206,9 @@ def top_config_input():
     drop_x=make_axis_input(x_options,'x') #DCC
     drop_y=make_axis_input(y_options,'y') #DCC
    
-    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
-        config_layout_top = [
+    config_layout_top = [
                     html.Div(className='chart-item', children=[html.Div(children=drop_x)],style={'display':'grid','width': '100%'}),
                     html.Div(className='chart-item', children=[html.Div(children=drop_y)],style={'display':'grid','width': '100%'}),
-                    html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid','width': '100%'}),
-                    html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid','width': '100%'})]
-    else:
-        config_layout_top = [
-                    html.Div(className='chart-item', children=[html.Div(children=drop_x)],style={'display':'grid','width': '100%'}),
                     html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid','width': '100%'}),
                     html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid','width': '100%'})]
     
@@ -217,9 +218,10 @@ def top_config_input():
 def bottom_config_input():
     plot_the_fig=make_go_button() #DCC
     
+    slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options: ") #DCC
+    slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options: ") #DCC
+        
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
-        slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options: ") #DCC
-        slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options: ") #DCC
         
         config_layout_bottom = [
             html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
@@ -234,8 +236,9 @@ def bottom_config_input():
             groups_to_include_options = persistentData.Group_Data.groupings
             
         group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-        
-        config_layout_bottom= [html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
+
+        config_layout_bottom= [
+            html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
             html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid','width': '100%'}),
             html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
             html.Div(className='chart-item', children=[html.Div(children=add_row)],style={'display':'grid','width': '100%'}),

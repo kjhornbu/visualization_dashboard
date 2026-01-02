@@ -100,7 +100,6 @@ def get_sov_slider(sov_value):
     persistentData.Plot_Configurations["myConfig"].filter['source_of_variation']=sov_value
     return
 
-
 @callback(Input('group_selection_table', 'data'),Input('group_selection_table', 'columns'))
 def get_desired_grouping(rows, columns):
     persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
