@@ -156,7 +156,8 @@ def make_radiobutton_topN():
     return radio
 
 def make_chart(plot_data):
-    chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y,),style={'width': '50vw', 'height': '50vh'})
+    chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y,),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
+    
     return chart
 
 def make_slider(slider_input,id_name,label):
