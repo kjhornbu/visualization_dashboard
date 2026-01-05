@@ -5,7 +5,7 @@
 
 import dash
 import more_itertools
-from dash import dcc
+from dash import dcc, html, dash_table
 from dash import html
 from dash.dependencies import Input, Output
 import pandas as pd
@@ -16,7 +16,7 @@ import math
 import time
 import os
 
-#Create a Configuration for Plotting
+## ALL CLASS DEFINTIONS
 class Config: 
     def __init__(self,use_sheet:str,x:str,y:str,groups_to_include:dict,config_reducereorder:dict,config_filter:dict):
         self.use_sheet = use_sheet
@@ -26,8 +26,6 @@ class Config:
         self.reduce_reorder = config_reducereorder #how the data to be plotted is reduced/ordered (show top Ntries, sorted on Y --- always sort on the Y entry?)
         self.filter = config_filter #Things applied to the Group Stats data set
 
-
-#Input and Organize Data Tables and Stat Sheets 
 class DataStructure:
     def __init__(self,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame):
         self.row_idx = row_idx
@@ -51,6 +49,7 @@ class DataStructure:
         return self.groupings
         
 class StatsStructure(DataStructure): 
+    # Should this be more connected to the data struture, where we use what is found in one, to assume(and then validate) is present in the other?
     def __init__(self,row_idx:pd.Series,row_description:pd.Series,data: pd.DataFrame):
         DataStructure.__init__(self,row_idx=row_idx,row_description=row_description,mode='stats',data=data)
         [self.sov_options,self.contrast_options]= self.set_stats_groupings()
@@ -60,12 +59,13 @@ class StatsStructure(DataStructure):
         self.contrast_options=list(self.data['contrast'].unique())
         
         return [self.sov_options, self.contrast_options]
-
+    
+## HELPER FUNCTIONS FOR DATA I/O
 def check_header_rows(path):
     header_num = None
     n=0
     while header_num is None:
-        data = pd.read_csv(path,delimiter='\t',low_memory=False,header=n)
+        data = pd.read_csv(path,delimiter='\t',low_memory=False,header=n,nrows=1000)
         for i,col in enumerate(data.columns):
             if type(col) is str:
                 x=re.search(r'(id64_fSABI)$',col) #made one of our weird meta table regions so that we dont' accidently pull soemething from the raw meta table header in the googlesheet
@@ -76,7 +76,7 @@ def check_header_rows(path):
 
 def load_data(path,mode):
     header_num=check_header_rows(path)
-    data = pd.read_csv(path,delimiter='\t',low_memory=False,header=header_num) #This number gets adjusted depending on how much stuff is in the description of the csv... unsure how we will deal with that in python versus matlab. 
+    data = pd.read_csv(path,delimiter='\t',low_memory=False,header=header_num)
     data_col_idx=data.iloc[0]
     data_comments=data.iloc[1]
     data = data.drop([data.index[0],data.index[1]]).reset_index()
@@ -96,121 +96,142 @@ def load_stats(path):
     
     return myStats
 
-def create_config_manual():
-    #table_type = organize_table_type()
-    table_type='stats'
-    if table_type == 'stats':
-        x_options = list(Group_Stats.data.columns)
-        #drop_x=make_axis_input(x_options,'x')
-
-        y_options = list(Group_Stats.data.columns)
-        #drop_y=make_axis_input(y_options,'y')
-
-        '''
-        radio_topN=make_radiobutton_topN()
-        radio_Pval=make_radiobutton_pvalue()
-
-        contrast_slider=make_slider(Group_Stats.contrast_options,'contrast_slider')
-        sov_slider=make_slider(Group_Stats.sov_options,'sov_slider')
-
-
-        [
-         html.Div(className='x_y_input', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
-         html.Div(
-            html.Label("FILTER BY: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            radio_Pval
-         ),
-        html.Div(
-            html.Label("SHOW: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            radio_topN,
-         ),
-           html.Div(
-            html.Label("Contrast ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            contrast_slider,
-         ),
-           html.Div(
-            html.Label("Source of Variation: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            sov_slider,
-         )
-        ]
-
-        '''
-        groups_to_include_options=None
+## MODIFICTIONS TO DATA BASED ON FILTER TYPE AND OTHER CRITERIA
+def use_config_on_Data():
+    #main user of config
+    if myConfig.filter is not None:
+        Reduced_Stats=filter_stat_sheet(myConfig.filter,Group_Stats.data)
+    else: 
+        Reduced_Stats=Group_Stats.data
         
-    elif table_type == "indiv":
-        x_options = list(Indiv_Data.data.columns)
-        y_options = list(Indiv_Data.data.columns)
-        groups_to_include_options = Indiv_Data.groupings
-    elif table_type == "group":
-        x_options = list(Group_Data.data.columns)
-        y_options = list(Group_Data.data.columns)
-        groups_to_include_options = Group_Data.groupings
+    if  myConfig.use_sheet == 'stats':
+        plot_data=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
+    elif myConfig.use_sheet == 'indiv':
+        Reduced_Stats=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats)
+    elif myConfig.use_sheet == 'group':
+        Reduced_Stats=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
+        plot_data=collect_from_data(Reduced_Stats)
+
+    return plot_data
+
+#Helper files for creating proper filtering of data table and stat sheet
+def filter_stat_sheet(config_filter,sheet):
+    reduced_sheet=sheet 
+    
+    for f in config_filter:
+        if config_filter[f] is not None: # if is none in entry then we are not filtering based on that
+            if f =='pval' or f =='pval_BH':
+                reduced_sheet = reduced_sheet[reduced_sheet[f] < config_filter[f]]
+            else:
+                reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]
+    return reduced_sheet
+
+def collect_from_data(sheet):
+    # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
+    if myConfig.use_sheet == 'group':
+        merged_data = pd.merge(sheet, Group_Data, on=myConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
+    elif myConfig.use_sheet =='indiv':
+        merged_data = pd.merge(sheet, Indiv_Data, on=myConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
         
-        rank_number = int 
-        rank_sort_options= y_options
+    col_names=merged_data.columns
+    for col in col_names:
+        x=re.search(r'(_delete_me)$',col)
+        if x: 
+            merged_data.drop(columns=col,inplace=True)
+    return merged_data
+
+def reduce_to_top(config_reduce,sheet):
+    if config_reduce['top_amount']=='ALL':
+        return sheet
+    else:
+        # Sort the reduced sheet on some sorting condition and return the top N (the sorting considered absolutes in conditioning)
+        sheet = sheet.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
+        return sheet[0:config_reduce['top_amount']]
+
+def reduce_to_top_Data():  
+    ## To do not yet actually filtering the data based on the comparisons provided
+    if myConfig.use_sheet == 'group':
+        data_pivot = pd.pivot_table(Group_Data.data, values=myConfig.y, index=myConfig.x, columns=list(Group_Data.groupings.keys()))
+    elif myConfig.use_sheet =='indiv':
+        data_pivot = pd.pivot_table(Indiv_Data.data, values=myConfig.y, index=myConfig.x, columns=list(Indiv_Data.groupings.keys()))
+    
+    # we want to do a pairwise comparison of 
+    for group_include in config.groups_to_include:
+        data_pivot
+    
+    result = math.comb(n, k)
+    # Do comparision to make sure we are considering all the comparisons to include in the graph. what has most to least. -- doesn't work currently
+    myConfig.reduce_reorder['top_amount']
+    data[0:myConfig.reduce_reorder['top_amount']]
+    
+    return 
+
+## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
+# In the order of top to bottom of layout
+def make_axis_input(data_options,id_name):
+    value_name= f"Select Data for {id_name}-axis"
+    placeholder_name=f"Select Data for {id_name}-axis"
+    dropdown = dcc.Dropdown(id=id_name,
+            options=data_options,
+            value=value_name,
+            placeholder=placeholder_name,
+        )
+    return dropdown
+
+def make_radiobutton_pvalue():
+    radio=dcc.RadioItems(options={'NONE':'NONE','p-value':'pval','p-value with BH':'pval_BH'}, value='NONE', inline=True, id='radio_pval')
+    return radio
+
+def make_radiobutton_topN():
+    radio=dcc.RadioItems(['ALL', 'TOP 10','TOP 20'], 'TOP 10', inline=True,id='radio_top')
+    return radio
+
+def make_chart(plot_data):
+    chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=myConfig.x, y=myConfig.y,),style={'width': '50vw', 'height': '50vh'})
+    return chart
+
+def make_slider(slider_input,id_name):
+    slider_dict={}
+    for i in range(len(slider_input)):
+        slider_dict.update({i:slider_input[i]})
+    slider=dcc.Slider(0, len(slider_input),marks=slider_dict, value=0, id=id_name)
+    return slider
+
+def make_grouping_selector(groups_to_include_options):
+    group_datatable=dash_table.DataTable()
+    return group_datatable
+
+#Need the call back here to actually run the config manual generator
+def generate_config(select_table_type,selected_radioPval,selected_radioTopN,selected_contrast,selected_sov,selected_x,selected_y,selected_groups_to_include):  
+    
+    if selected_radioPval=='NONE':
+        set_pval='pval'
+        set_pval_value=None
+    else:
+        set_pval=selected_radioPval
+        set_pval_value=0.05
             
-    
-    '''
-    source_of_variation=
-    
-    dcc.Dropdown(s
-            id='select-data',
-            options={'Stats Output': 'stats_output',
-                    'Group Data Table': 'group_data_table',
-                    'Subject Data Table': 'subject_data_table'},
-            value='Select the table you are using to plot data',
-            placeholder='Select the table you are using to plot data',
-        )
-    
-    
-        dcc.Dropdown(
-            id='select-axis-x',
-            options={'Stats Output': 'stats_output',
-                    'Group Data Table': 'group_data_table',
-                    'Subject Data Table': 'subject_data_table'},
-            value='Select the table you are using to plot data',
-            placeholder='Select the table you are using to plot data',
-        )
+    if select_table_type == 'stats':
+        selected_groups_to_include=None
         
-        dcc.Dropdown(
-            id='select-axis-y',
-            options={'Stats Output': 'stats_output',
-                    'Group Data Table': 'group_data_table',
-                    'Subject Data Table': 'subject_data_table'},
-            value='Select the table you are using to plot data',
-            placeholder='Select the table you are using to plot data',
-        )
+    elif select_table_type == "indiv":
+        selected_contrast=None
+        selected_sov=None
+
+    elif select_table_type == "group":
+        selected_contrast=None
+        selected_sov=None
     
-    #What table are we using for plot data?
-        #Stats, Indiv_Data,Group_Data
-        # If Indiv_Data or Group Data Need to kow how to filter the data such that selecting correct points -- the groups to pull
-    
-    #What data should be on the x axis?
-    
-    #What data should be on the y axis?
-    
-    #What phenotype and source of variation should be plotted? 
-        #phenotype volume, FA AD RD MD etc, Source f variation (pull from stat sheet)
-    #    
-    #Would you like to reduce the number of entries displayed via a Rank ordering? 
-        #Y,N -> then assign as None
-        # if Y then assign the top_amount to the number given and sort_on to myConfig.y
-    '''
-    
-    myConfig = Config(use_sheet='stats',x='GN_Symbol',y='percent_change_Young - -_Old - -',groups_to_include=None,config_reducereorder={'top_amount':10,'sort_on':'percent_change_Young - -_Old - -'},config_filter={'pval_BH':0.05,
-                    'source_of_variation':'Age_Class',
-                    'contrast':'fa_mean'})
-    
+    myConfig = Config(use_sheet=select_table_type,x=selected_x,y=selected_y,groups_to_include=selected_groups_to_include,config_reducereorder={'top_amount':selected_radioTopN,'sort_on':selected_y},config_filter={set_pval:set_pval_value,
+                    'source_of_variation':selected_sov,
+                    'contrast':selected_contrast})
     return myConfig
 
-def create_config_prompt():
-    myConfig=None
-
-    return myConfig
-
-# Initialize the Dash app
+## INITALIZE THE DASH APP
 app = dash.Dash(__name__)
 
+## MAIN BODY OF THE DASH APP
 app.layout = html.Div([
     html.H1(children='CIVM Visualization Dashboard', style={'textAlign':'center', 'color':"#012169", 'font-size':24,'font-family':'Arial'}),
     html.Div([
@@ -236,190 +257,126 @@ app.layout = html.Div([
             value='Select Mode for Configuration Input',
             placeholder='Select Mode for Configuration Input',
         )],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
-    html.Div([html.Div(id='table_select-container',children = dcc.Dropdown(options={'stats':'Group Statistical Results','group':'Group Data Table','indiv': 'Subject Data Table'},placeholder='Select Main Table for Visualization', id='table_options'), style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),]),
-    html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'}),])
+    html.Div([html.Div(id='table-select-container')],style ={'width':'80%', 'font-size':18, 'margin':5,'font-family':'Arial'}),
+    html.Div([html.Div(id='output-container', className='chart-grid', style={'display': 'flex'})])
 ])
-#upload all data tables and stats sheets
+
+
+# All your callbacks have to be between the end of the app layout and the app run call to work properly
+## OBTAINING DATA CALLBACKS
 @app.callback(Output("loading-stat_sheet", "children"),
     Input(component_id='group_stats_path',component_property='value'))
 def update_input_stats (path):
+    print(path)
     if path is not None and os.path.exists(path):
-        time.sleep(2)
+        time.sleep(1)
         global Group_Stats
         Group_Stats = load_stats(path)
-        
-        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
     return
+
 @app.callback(Output("loading-group_data", "children"),
     Input(component_id='group_data_path',component_property='value'))
 def update_input_group_data (path):
+    print(path)
     if path is not None and os.path.exists(path):
         time.sleep(1)
         global Group_Data
         Group_Data = load_data(path,mode='group')
-        
-        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
     return
+
 @app.callback(Output("loading-indiv_data", "children"),
     Input(component_id='indiv_data_path',component_property='value'))
-def update_input_indiv_data (path):   
+def update_input_indiv_data (path):
+    print(path)
     if path is not None and os.path.exists(path): 
         time.sleep(1)
         global Indiv_Data
         Indiv_Data = load_data(path,mode='indiv')
-        
-        #This still does not handle what happens if the path does not extist or is none this will still spin but it won't actually load the data need a good error handler here
     return
-#start Plot Callback
-@app.callback(Output(component_id='output-container', component_property='children'),
-             [Input(component_id='select-mode', component_property='value')])
-def set_figure_to_output (mode):
-    global myConfig
-    if mode == 'Manual':
-        myConfig=create_config_manual()
-        if isinstance(Indiv_Data, DataStructure) and isinstance(Group_Data, DataStructure) and isinstance(Group_Stats, StatsStructure):
-            return plot_by_config()
-        else:
-            return None
-    elif mode == 'Prompt':
-        myConfig=create_config_prompt()
-        if isinstance(Indiv_Data, DataStructure) and isinstance(Group_Data, DataStructure) and isinstance(Group_Stats, StatsStructure):
-            return plot_by_config()
-        else: 
-            return None
-        '''
-        drop_x=make_axis_input(list(Group_Stats.data.columns),'x')
-        drop_y=make_axis_input(list(Group_Stats.data.columns),'y')
-        radio_topN=make_radiobutton_topN()
-        radio_Pval=make_radiobutton_pvalue()
-        contrast_slider=make_slider(Group_Stats.contrast_options,'contrast_slider')
-        sov_slider=make_slider(Group_Stats.sov_options,'sov_slider')
 
-        A=[
-         html.Div(className='x_y_input', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
-         html.Div(
-            html.Label("FILTER BY: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            radio_Pval
-         ),
-        html.Div(
-            html.Label("SHOW: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            radio_topN,
-         ),
-         plot_by_config(config,Indiv_Data,Group_Data,Group_Stats),
-        html.Div(
-            html.Label("Contrast ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            contrast_slider,
-         ),
-        html.Div(
-            html.Label("Source of Variation: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),
-            sov_slider,
-         )
-        ]
-        print(A)
-        '''
-# filter and plot via the config file
-def plot_by_config():
-    if myConfig.filter is not None:
-        Reduced_Stats=filter_stat_sheet(myConfig.filter,Group_Stats.data)
-    else: 
-        Reduced_Stats=Stats.data
+@app.callback(Output(component_id='table-select-container',component_property='children'),Input(component_id='select-mode',component_property='value'))
+def make_table_type_dropdown(input_mode):
+    print('at table dropdown')
+    if input_mode=='Manual':
+        table_type_dropdown=dcc.Dropdown(options={'stats':'Group Statistical Results','group':'Group Data Table','indiv': 'Subject Data Table'},placeholder='Select Main Table for Visualization', id='main_plot_table')
+        return table_type_dropdown
+    elif input_mode =='Prompt':
+        return None
+    else:
+        return None
+    
+## THE FULL FIGURE LAYOUT 
+def full_fig_layout(select_table_4_plotting):
+    #we need to know at least what table we are plotting from to be able to setup the full layout of the figure which then we query to setup the configuration
+    radioPval=make_radiobutton_pvalue()# DCC
+    radioTopN=make_radiobutton_topN()# DCC
+    print('at full_fig_layout')
+    if select_table_4_plotting == 'stats':
+        x_options = list(Group_Stats.data.columns)
+        y_options = list(Group_Stats.data.columns)
         
-    if myConfig.reduce_reorder is not None and myConfig.use_sheet == 'stats':
-        plot_data=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
-    elif myConfig.reduce_reorder is not None and myConfig.use_sheet == 'indiv':
-        Reduced_Stats=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Reduced_Stats)
-    elif myConfig.reduce_reorder is not None and myConfig.use_sheet == 'group':
-        Reduced_Stats=reduce_to_top(myConfig.reduce_reorder,Reduced_Stats)
-        plot_data=collect_from_data(Reduced_Stats)
+        drop_x=make_axis_input(x_options,'x') # DCC
+        drop_y=make_axis_input(y_options,'y') #DCC
     
-    chart = dcc.Graph(id ='output-graph',
-        figure=px.scatter(plot_data, 
-            x=myConfig.x,
-            y=myConfig.y,),
-        style={'width': '50vw', 'height': '50vh'})
+        slider_contrast=make_slider(Group_Stats.contrast_options,'contrast_slider') #DCC
+        slider_sov=make_slider(Group_Stats.sov_options,'sov_slider') #DCC
     
-    return [html.Div(className='chart-item', children=[html.Div(children=chart)])]
+        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
 
-#Helper files for creating proper filtering of data table and stat sheet
-def filter_stat_sheet(config_filter,sheet):
-    reduced_sheet=sheet 
-    for f in config_filter:
-        if f =='pval' or f =='pval_BH':
-            reduced_sheet = reduced_sheet[reduced_sheet[f] < config_filter[f]]
-        else:
-            reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]
-    return reduced_sheet
-
-def collect_from_data(sheet):
-    if myConfig.use_sheet == 'group':
-        merged_data = pd.merge(sheet, Group_Data, on=myConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
-    elif myConfig.use_sheet =='indiv':
-        merged_data = pd.merge(sheet, Indiv_Data, on=myConfig.x, how='inner',copy=False,suffixes= ("", "_delete_me"))
-        
-    col_names=merged_data.columns
-    for col in col_names:
-        x=re.search(r'(_delete_me)$',col)
-        if x: 
-            merged_data.drop(columns=col,inplace=True)
-    return merged_data
-
-def reduce_to_top(config_reduce,sheet):
-    sheet = sheet.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
-    return sheet[0:config_reduce['top_amount']]
-
-def reduce_to_top_Data():  
-    ## To do not yet actually filtering the data based on teh comparisons provided
-    if myConfig.use_sheet == 'group':
-        data_pivot = pd.pivot_table(Group_Data.data, values=myConfig.y, index=myConfig.x, columns=list(Group_Data.groupings.keys()))
-    elif myConfig.use_sheet =='indiv':
-        data_pivot = pd.pivot_table(Indiv_Data.data, values=myConfig.y, index=myConfig.x, columns=list(Indiv_Data.groupings.keys()))
-    
-    # we want to do a pairwise comparison of 
-    for group_include in config.groups_to_include:
-        data_pivot
-    
-    result = math.comb(n, k)
-    # Do comparision to make sure we are considering all the comparisons to include in the graph. what has most to least. 
-    myConfig.reduce_reorder['top_amount']
-    data[0:myConfig.reduce_reorder['top_amount']]
-    
-    return 
-
-def define_group_inputs_to_plot():
-    if myConfig.use_sheet == 'group':
-        group_iputs = Group_Data.groupings
-    elif myConfig.use_sheet =='indiv':
-        group_inputs = Indiv_Data.groupings
-    
-    return group_inputs
-
-def make_axis_input(data_options,id_name):
-    value_name= f"Select Data for {id_name}-axis"
-    placeholder_name=f"Select Data for {id_name}-axis"
-    dropdown = dcc.Dropdown(id=id_name,
-            options=data_options,
-            value=value_name,
-            placeholder=placeholder_name,
-        )
-    return dropdown
-
-def make_radiobutton_pvalue():
-    radio=dcc.RadioItems(options={'NONE':'NONE','p-value':'pval','p-value with BH':'pval_BH'}, value='NONE', inline=True, id='radio_pval')
-    return radio
-
-def make_radiobutton_topN():
-    radio=dcc.RadioItems(['ALL', 'TOP 10','TOP 20'], 'TOP 10', inline=True,id='radio_top')
-    return radio
-
-def make_slider(slider_input,id_name):
-    slider_dict={}
-    for i in range(len(slider_input)):
-        slider_dict.update({i:slider_input[i]})
-    slider=dcc.Slider(0, len(slider_input),marks=slider_dict, value=0, id=id_name)
-    #either use'contrast_slider' or 'source_slider'
-    return slider
+    elif select_table_4_plotting == 'indiv':
+        x_options = list(Indiv_Data.data.columns)
+        y_options = list(Indiv_Data.data.columns)
             
-# Run the Dash app
+        drop_x=make_axis_input(x_options,'x') # DCC
+        drop_y=make_axis_input(y_options,'y') #DCC
+            
+        groups_to_include_options = Indiv_Data.groupings
+
+        group_datatable=make_grouping_selector(groups_to_include_options)#DCC    
+        slider_contrast=None
+        slider_sov=None
+
+        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
+            
+    elif select_table_4_plotting == 'group':
+        x_options = list(Group_Data.data.columns)
+        y_options = list(Group_Data.data.columns)
+            
+        drop_x=make_axis_input(x_options,'x') # DCC
+        drop_y=make_axis_input(y_options,'y') #DCC
+            
+        groups_to_include_options = Group_Data.groupings
+
+        group_datatable=make_grouping_selector(groups_to_include_options)#DCC    
+        slider_contrast=None
+        slider_sov=None
+
+        fig_layout = [html.Div(className='chart-item', children=[html.Div(children=drop_x),html.Div(children=drop_y)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'}),
+                html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid'})]
+    
+    return fig_layout
+
+## HAve to have the config to do the config and that is screwing with me. The actual configuration setup needs a ton of selection points or at least set data....
+#start Plot Callback
+@app.callback(Output(component_id='output-container', component_property='children'),[Input(component_id='main_plot_table',component_property='value')])
+def set_figure_to_output_Manual(select_table_4_plotting):
+    global myConfig
+    message= 'Make Sure All Data Files Are Loaded and Exist At Path Location'
+    print('right before generating config')
+    myConfig=generate_config()
+    if isinstance(Indiv_Data, DataStructure) and isinstance(Group_Data, DataStructure) and isinstance(Group_Stats, StatsStructure):
+        return full_fig_layout(select_table_4_plotting)
+    else:
+        return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message))])]
+    
+    ## RUN THE DASH APP
 if __name__ == '__main__':
     app.run(debug=True)
