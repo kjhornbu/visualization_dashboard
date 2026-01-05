@@ -38,9 +38,10 @@ class DataStructure:
                 x=re.search(r'(group[0-9]+)$',col)
                 if x:
                     temp=list(self.data[str(self.row_description.index[i])].unique())
-                    ordered_temp=sorted(temp)
+                    ordered_temp=sorted(temp) 
                     if self.mode == 'indiv':
                         temp.append('-')
+                        ordered_temp=sorted(temp)
                     groupings.update({str(self.row_description.index[i]):ordered_temp})
         self.groupings = groupings
         return self.groupings
