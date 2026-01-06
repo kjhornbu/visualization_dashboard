@@ -1,5 +1,4 @@
 # In[ ]:
-
 from dash import Dash, dcc, html, dash_table,Input, Output, callback,ctx
 import pandas as pd
 import time
@@ -121,7 +120,8 @@ def make_graph(isgo):
     if "go_button" == ctx.triggered_id and isgo>0:
         plot_data_out=use_config_on_Data()
         chart=make_chart(plot_data_out)
-        return chart
+        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)
+        return [chart,html.Div(className='chart-item', children=[html.Div(children=download_button)],style={'display':'grid','width': '100%'})]
     else:
         return None
     
@@ -139,6 +139,15 @@ def add_row(n_clicks, rows, columns):
     if n_clicks > 0:
         rows.append({c['id']: '-' for c in columns})
     return rows
+
+@callback(
+    Output("export-data-grid", "exportDataAsCsv"),
+    Input("csv-button", "n_clicks"),
+)
+def export_data_as_csv(n_clicks):
+    if n_clicks:
+        return True
+    return False
 
 ## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS    
 @callback(Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),

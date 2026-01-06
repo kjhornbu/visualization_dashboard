@@ -1,5 +1,4 @@
 # In[ ]:
-
 from dash import Dash,dcc, html, dash_table, Input, Output, State
 import pandas as pd
 import numpy as np
@@ -101,32 +100,37 @@ def reduce_to_top(config_reduce,Reduced_Stats):
         return Reduced_Stats[0:int(config_reduce['top_amount'])]
 
 def reduce_to_top_Data(config_reduce):
-    frames=[]
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+        frames=[]
         data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
         for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
             data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
             data_values=tuple(data_dict.values())
             frames.append(data_pivot[data_values])
+        data_playwith = pd.concat(frames, axis=1)
         
     elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
-        check_key=persistentData.Indiv_Data.groupings
-      
-        print(persistentData.Plot_Configurations["myConfig"].groups_to_include.keys())
-        
-        
-        for key in list(check_key.keys()):
-            if check_key[key] == '-':
-                check_key.pop(key)
-                
-        data_pivot = pd.pivot_table(persistentData.Indiv_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Indiv_Data.groupings.keys()))
-    
-        
-    data_playwith = pd.concat(frames, axis=1)
+        frames=[]
+        for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
+            data_work=persistentData.Indiv_Data.data
+            data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
+            data_dict_keys=data_dict.keys()
+            data_values=tuple(data_dict.values())
+            for j,key in enumerate(data_dict_keys):
+                if data_dict[key] != '-':
+                    data_work=data_work[data_work[key]==data_dict[key]]
+            
+            temp_work=data_work[[persistentData.Plot_Configurations["myConfig"].x,persistentData.Plot_Configurations["myConfig"].y]]
+            temp_work=temp_work.rename(columns={persistentData.Plot_Configurations["myConfig"].y:data_values})
+            melt_plot_data=pd.melt(temp_work,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=temp_work.columns[1:])
+            #frames.append(temp_work)
+            frames.append(melt_plot_data)
+
+        data_playwith = pd.concat(frames, axis=0) 
     
     # Sort data into most least different for each row to see the maximal range of expression
-    max_per_row = data_playwith.max(axis='columns')
-    min_per_row = data_playwith.min(axis='columns')
+    max_per_row = data_playwith.max(axis='columns',skipna=True)
+    min_per_row = data_playwith.min(axis='columns',skipna=True)
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
 
     if config_reduce['top_amount'] == 'None':
@@ -165,7 +169,8 @@ def make_chart(plot_data):
             column_name.append("".join(col))
         plot_data.columns=column_name
         melt_plot_data=pd.melt(plot_data,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=plot_data.columns[1:-1])
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(melt_plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y}),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(melt_plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
+                          ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     return chart
 
 def make_slider(slider_input,id_name,label):
@@ -252,7 +257,8 @@ def bottom_config_input():
             html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
             html.Div(className='chart-item', children=[html.Div(children=add_row)],style={'display':'grid','width': '100%'}),
             html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
-    
+
+
     fig_layout=html.Div(className='chart-item', children=config_layout_bottom,id='config_bottom')
     return fig_layout
 
