@@ -43,6 +43,7 @@ def load_stats(path):
     myStats = StatsStructure(row_idx = stats_col_idx,row_description = stats_comments,data = stats)
     return myStats
 
+
 ## MODIFICTIONS TO DATA BASED ON FILTER TYPE AND OTHER CRITERIA
 def collect_from_data(sheet,data_playwith):
     series=sheet[persistentData.Plot_Configurations["myConfig"].x]
@@ -57,7 +58,7 @@ def collect_from_data(sheet,data_playwith):
     df = pd.DataFrame(series.values,columns=pd.MultiIndex.from_tuples([tuple(series_name)]))
     # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or  persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
-        merged_data = pd.merge(df, data_playwith, on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
+        merged_data = pd.merge(data_playwith,df,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
     col_names=merged_data.columns
     
     for col in col_names:
@@ -90,18 +91,27 @@ def use_config_on_Data():
 
 #Helper files for creating proper filtering of data table and stat sheet
 def reduce_to_top(config_reduce,Reduced_Stats):
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+        sort_on=config_reduce['sort_on']
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+        sort_on='sorting_column'
+    
     if config_reduce['top_amount'] == 'None':
         return Reduced_Stats
     elif config_reduce['top_amount'] == 'All':
-        Reduced_Stats = Reduced_Stats.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
+        Reduced_Stats = Reduced_Stats.sort_values(by=sort_on,key=abs,ascending=False)
         return Reduced_Stats
     else:
-        Reduced_Stats = Reduced_Stats.sort_values(by=config_reduce['sort_on'],key=abs,ascending=False)
+        Reduced_Stats = Reduced_Stats.sort_values(by=sort_on,key=abs,ascending=False)
         return Reduced_Stats[0:int(config_reduce['top_amount'])]
 
 def reduce_to_top_Data(config_reduce):
+    Prepped_Data=prep_Data_for_reduce()
+    return reduce_to_top(config_reduce,Prepped_Data)
+
+def prep_Data_for_reduce():
+    frames=[]
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
-        frames=[]
         data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
         for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
             data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
@@ -110,9 +120,17 @@ def reduce_to_top_Data(config_reduce):
         data_playwith = pd.concat(frames, axis=1)
         
     elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
-        frames=[]
         for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
             data_work=persistentData.Indiv_Data.data
+            if persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'B':
+                data_work=data_work[data_work['hemisphere_assignment']=='0']
+            elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'L':
+                data_work=data_work[data_work['hemisphere_assignment']=='-1']
+            elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'R':
+                data_work=data_work[data_work['hemisphere_assignment']=='1']
+            
+            print(data_work)
+            
             data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
             data_dict_keys=data_dict.keys()
             data_values=tuple(data_dict.values())
@@ -122,27 +140,20 @@ def reduce_to_top_Data(config_reduce):
             
             temp_work=data_work[[persistentData.Plot_Configurations["myConfig"].x,persistentData.Plot_Configurations["myConfig"].y]]
             temp_work=temp_work.rename(columns={persistentData.Plot_Configurations["myConfig"].y:data_values})
+            
             melt_plot_data=pd.melt(temp_work,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=temp_work.columns[1:])
-            #frames.append(temp_work)
             frames.append(melt_plot_data)
-
-        data_playwith = pd.concat(frames, axis=0) 
-    
+        data_playwith = pd.concat(frames, axis=0)  #This combines so each specimen's region entry for a given contrast is relayed (231*3*Nspecimen rows)
     # Sort data into most least different for each row to see the maximal range of expression
-    max_per_row = data_playwith.max(axis='columns',skipna=True)
+    max_per_row = data_playwith.max(axis='columns',skipna=True) #this doesn't work with indiv because of the differnet index for everything.
     min_per_row = data_playwith.min(axis='columns',skipna=True)
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
 
-    if config_reduce['top_amount'] == 'None':
-        return data_playwith
-    elif config_reduce['top_amount'] == 'All':
-        data_playwith = data_playwith.sort_values(by='sorting_column',key=abs,ascending=False)
-        return data_playwith
-    else:
-        data_playwith = data_playwith.sort_values(by='sorting_column',key=abs,ascending=False)
-        return data_playwith[0:int(config_reduce['top_amount'])]
+    return data_playwith
     
 ## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
+# These are all the parts needed to assign congif
+
 def make_axis_input(data_options,id_name):
     value_name= f"Select Data for {id_name}-axis"
     placeholder_name=f"Select Data for {id_name}-axis"
@@ -160,18 +171,9 @@ def make_radiobutton_topN():
     radio=html.Div([html.Label("Select X-Axis Windowing: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'None':'All without Sorting','All':'All with Sorting',10:'TOP 10',20:'TOP 20'}, inline=True,id='radio_TopN')])
     return radio
 
-def make_chart(plot_data):
-    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
-    else:
-        column_name=[]
-        for i,col in enumerate(plot_data.columns):
-            column_name.append("".join(col))
-        plot_data.columns=column_name
-        melt_plot_data=pd.melt(plot_data,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=plot_data.columns[1:-1])
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(melt_plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
-                          ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
-    return chart
+def make_hemisphere_selector():
+    hemisphere=html.Div([html.Label("Select Hemisphere(s) to Include: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'All':'All','B':'Bilateral','L':'Left','R':'Right'}, inline=True,id='hemisphere')])
+    return hemisphere
 
 def make_slider(slider_input,id_name,label):
     slider_dict={}
@@ -203,9 +205,27 @@ def make_add_button():
     add_button=html.Button('Add Row', id='add-rows-button', n_clicks=0)
     return add_button
 
+def make_chart(plot_data):
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
+    else:
+        column_name=[]
+        for i,col in enumerate(plot_data.columns):
+            column_name.append("".join(col))
+        plot_data.columns=column_name
+        melt_plot_data=pd.melt(plot_data,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=plot_data.columns[1:-1])
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(melt_plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
+                          ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
+    return chart
+
+## This creates the full block of data that is the 
 def top_config_input():
     radioPval=make_radiobutton_pvalue() #DCC
     radioTopN=make_radiobutton_topN() #DCC
+
+    slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options For Significance Filtering: ") #DCC
+    slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options For Significance Filtering: ") #DCC
+   
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         x_options = list(persistentData.Group_Stats.data.columns)
         y_options = list(persistentData.Group_Stats.data.columns)
@@ -219,45 +239,46 @@ def top_config_input():
         
     drop_x=make_axis_input(x_options,'x') #DCC
     drop_y=make_axis_input(y_options,'y') #DCC
-   
+    
     config_layout_top = [
                     html.Div(className='chart-item', children=[html.Div(children=drop_x)],style={'display':'grid','width': '100%'}),
                     html.Div(className='chart-item', children=[html.Div(children=drop_y)],style={'display':'grid','width': '100%'}),
                     html.Div(className='chart-item', children=[html.Div(children=radioPval)],style={'display':'grid','width': '100%'}),
-                    html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid','width': '100%'})]
+                    html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
+                    html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid','width': '100%'}),
+                    html.Div(className='chart-item', children=[html.Div(children=radioTopN)],style={'display':'grid','width': '100%'}),]
     
     fig_layout=html.Div(className='chart-item', children=config_layout_top,id='config_top')
     return fig_layout
 
 def bottom_config_input():
     plot_the_fig=make_go_button() #DCC
-    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
-        slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options: ") #DCC
-        slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options: ") #DCC
+    radioTopN=make_radiobutton_topN() #DCC
     
-        config_layout_bottom = [
-            html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
+    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+        config_layout_bottom = [html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
     else: 
         add_row=make_add_button()#DCC
         if persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
             groups_to_include_options = persistentData.Indiv_Data.groupings
+        
+            group_datatable=make_grouping_selector(groups_to_include_options)#DCC
+            hemisphere = make_hemisphere_selector()#DCC
+            
+            config_layout_bottom= [
+                html.Div(className='chart-item', children=[html.Div(children=hemisphere)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=add_row)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
 
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
             groups_to_include_options = persistentData.Group_Data.groupings
-            
-        group_datatable=make_grouping_selector(groups_to_include_options)#DCC
-        slider_contrast=make_slider(persistentData.Group_Stats.contrast_options,'contrast_slider',"Contrast Options For Filtering: ") #DCC
-        slider_sov=make_slider(persistentData.Group_Stats.sov_options,'sov_slider',"Source of Variation Options For Filtering: ") #DCC
+            group_datatable=make_grouping_selector(groups_to_include_options)#DCC
 
-        config_layout_bottom= [
-            html.Div(className='chart-item', children=[html.Div(children=slider_contrast)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=slider_sov)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=add_row)],style={'display':'grid','width': '100%'}),
-            html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
-
+            config_layout_bottom= [
+                html.Div(className='chart-item', children=[html.Div(children=group_datatable)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=add_row)],style={'display':'grid','width': '100%'}),
+                html.Div(className='chart-item', children=[html.Div(children=plot_the_fig)],style={'display':'grid','width': '100%'})]
 
     fig_layout=html.Div(className='chart-item', children=config_layout_bottom,id='config_bottom')
     return fig_layout

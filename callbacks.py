@@ -107,12 +107,17 @@ def get_sov_slider(sov_value):
     persistentData.Plot_Configurations["myConfig"].filter['source_of_variation']=sov_value
     return
 
+@callback(Input(component_id='hemisphere', component_property='value'))
+def get_hemisphere(hemisphere_value):
+    persistentData.Plot_Configurations["myConfig"].reduce_reorder.pop('hemisphere',None)
+    persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere']=hemisphere_value
+    return
+
 @callback(Input('group_selection_table', 'data'),
           Input('group_selection_table', 'columns'))
 def get_desired_grouping(rows, columns):
     persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
     return
-
 
 @callback(Output(component_id='output-container',component_property='children', allow_duplicate=True),
           Input(component_id='go_button',component_property='n_clicks'),prevent_initial_call=True)
@@ -120,7 +125,7 @@ def make_graph(isgo):
     if "go_button" == ctx.triggered_id and isgo>0:
         plot_data_out=use_config_on_Data()
         chart=make_chart(plot_data_out)
-        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)
+        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)      
         return [chart,html.Div(className='chart-item', children=[html.Div(children=download_button)],style={'display':'grid','width': '100%'})]
     else:
         return None
