@@ -48,19 +48,20 @@ def load_stats(path):
 def collect_from_data(sheet,data_playwith):
     series=sheet[persistentData.Plot_Configurations["myConfig"].x]
     df = series.to_frame()
-    series_name=[]
-    for n in range(0,len(data_playwith.columns[0])):
-        if n==0:
-            series_name.append(series.name)
-        else:
-            series_name.append('')
-    
-    df = pd.DataFrame(series.values,columns=pd.MultiIndex.from_tuples([tuple(series_name)]))
+    #series_name=[]
+    #for n in range(0,len(data_playwith.columns[0])):
+    #    if n==0:
+    #        series_name.append(series.name)
+    #    else:
+    #        series_name.append('')
+    #
+    #df = pd.DataFrame(series.values,columns=pd.MultiIndex.from_tuples([tuple(series_name)]))
     # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or  persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
+        print(data_playwith)
+        print(df)
         merged_data = pd.merge(data_playwith,df,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
     col_names=merged_data.columns
-    
     for col in col_names:
         if not (isinstance(col, str) or (isinstance(col, tuple) and (isinstance(col[0],str)))):
             merged_data.drop(columns=col,inplace=True)            
@@ -110,46 +111,90 @@ def reduce_to_top_Data(config_reduce):
     return reduce_to_top(config_reduce,Prepped_Data)
 
 def prep_Data_for_reduce():
-    frames=[]
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
-        data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
-        for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
-            data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
-            data_values=tuple(data_dict.values())
-            frames.append(data_pivot[data_values])
-        data_playwith = pd.concat(frames, axis=1)
+        data_playwith_Group=prep_Data_Group()
         
+        column_name=[]
+        for i,col in enumerate(data_playwith_Group.columns):
+            column_name.append("".join(col))
+        data_playwith_Group.columns=column_name
+        melt_data_Group=pd.melt(data_playwith_Group,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=data_playwith_Group.columns[1:-1])
+        
+        return melt_data_Group
     elif persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
-        for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
-            data_work=persistentData.Indiv_Data.data
-            if persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'B':
-                data_work=data_work[data_work['hemisphere_assignment']=='0']
-            elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'L':
-                data_work=data_work[data_work['hemisphere_assignment']=='-1']
-            elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'R':
-                data_work=data_work[data_work['hemisphere_assignment']=='1']
-            
-            print(data_work)
-            
-            data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
-            data_dict_keys=data_dict.keys()
-            data_values=tuple(data_dict.values())
-            for j,key in enumerate(data_dict_keys):
-                if data_dict[key] != '-':
-                    data_work=data_work[data_work[key]==data_dict[key]]
-            
-            temp_work=data_work[[persistentData.Plot_Configurations["myConfig"].x,persistentData.Plot_Configurations["myConfig"].y]]
-            temp_work=temp_work.rename(columns={persistentData.Plot_Configurations["myConfig"].y:data_values})
-            
-            melt_plot_data=pd.melt(temp_work,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=temp_work.columns[1:])
-            frames.append(melt_plot_data)
-        data_playwith = pd.concat(frames, axis=0)  #This combines so each specimen's region entry for a given contrast is relayed (231*3*Nspecimen rows)
-    # Sort data into most least different for each row to see the maximal range of expression
-    max_per_row = data_playwith.max(axis='columns',skipna=True) #this doesn't work with indiv because of the differnet index for everything.
-    min_per_row = data_playwith.min(axis='columns',skipna=True)
+        data_playwith_Indiv=prep_Data_Indiv()
+        return data_playwith_Indiv
+        
+def prep_Data_Group(from_indiv=False,alt_columns=None):
+    frames=[]
+    All_Group_Entries_v2=[]
+    if from_indiv:
+        data_work=pull_hemisphere_data()
+        data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
+        All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
+        
+        for i in range(len(All_Group_Entries)):
+            data_dict=All_Group_Entries[i]
+            alt_columns_keys=alt_columns.keys()
+            adjusted_dict={}
+            for j,key in enumerate(alt_columns_keys):
+                adjusted_dict.update({key:data_dict.pop(key)})
+            All_Group_Entries_v2.append(adjusted_dict)     
+        All_Group_Entries=All_Group_Entries_v2
+    else:
+        data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
+        All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
+        
+    for i in range(len(All_Group_Entries)):
+        data_dict=All_Group_Entries[i]
+        data_values=data_dict.values()#tuple(data_dict.values())
+        frames.append(data_pivot[data_values])
+        
+    data_playwith = pd.concat(frames, axis=1)
+    
+    max_per_row = data_playwith.max(axis='columns')
+    min_per_row = data_playwith.min(axis='columns')
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
 
     return data_playwith
+
+def pull_hemisphere_data():
+    data_work=persistentData.Indiv_Data.data
+    # Filter to desired hemisphere
+    if persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'B':
+        data_work=data_work[data_work['hemisphere_assignment']=='0']
+    elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'L':
+        data_work=data_work[data_work['hemisphere_assignment']=='-1']
+    elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'R':
+        data_work=data_work[data_work['hemisphere_assignment']=='1']
+    return data_work
+    
+def prep_Data_Indiv():
+    frames=[]
+    alt_Key_Compiler=[]
+    for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
+        data_work=pull_hemisphere_data()  
+        data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
+        data_dict_keys=data_dict.keys()
+        data_values=tuple(data_dict.values())
+        for j,key in enumerate(data_dict_keys):
+            if data_dict[key] != '-':
+                data_work=data_work[data_work[key]==data_dict[key]]
+                alt_Key_Compiler.append(key)
+            
+        temp_work=data_work[[persistentData.Plot_Configurations["myConfig"].x,persistentData.Plot_Configurations["myConfig"].y]]
+        temp_work=temp_work.rename(columns={persistentData.Plot_Configurations["myConfig"].y:data_values})
+        melt_plot_data=pd.melt(temp_work,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=temp_work.columns[1:])
+        frames.append(melt_plot_data)
+        
+    data_playwith = pd.concat(frames, axis=0)  #This combines so each specimen's region entry for a given contrast is relayed (231*Nspecimen rows)  
+    data_playwith_Group=prep_Data_Group(True,dict.fromkeys(alt_Key_Compiler))
+    
+    merged_data = pd.merge(data_playwith,data_playwith_Group,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
+    
+    subject_data_shape=data_playwith.shape
+    group_data_shape=data_playwith_Group.shape
+    return merged_data
     
 ## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
 # These are all the parts needed to assign congif
@@ -209,12 +254,10 @@ def make_chart(plot_data):
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     else:
-        column_name=[]
-        for i,col in enumerate(plot_data.columns):
-            column_name.append("".join(col))
-        plot_data.columns=column_name
-        melt_plot_data=pd.melt(plot_data,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=plot_data.columns[1:-1])
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(melt_plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
+        
+        ### TO DO: Broke Group data plotting --- probably the wrong data type now since I am doing 2 things at once
+        ### TO DO: Need to allow all instances of a given region not the explicit 10 or 20 rows. -- breaks most for the 
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
                           ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     return chart
 
