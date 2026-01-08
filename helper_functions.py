@@ -145,21 +145,22 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
         data_work=pull_hemisphere_data()
         data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
         columns_set=list(alt_columns)
-        print(data_pivot)
         
         if len(alt_columns)>1:
             for i in range(len(alt_columns)):
                 data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
-                print(data_pivot_2)
-                data_name=[]
-                for n in range(0,len(columns_set)):
-                    if n==i:
-                        data_name.append(columns_set[i])
-                    else:
-                        data_name.append('')
-                    print(data_name)
-                print(data_pivot.columns)
-                print(pd.DataFrame(data_pivot_2.values,columns=pd.MultiIndex.from_tuples(columns_set)))
+                data_name=data_pivot_2.columns
+                
+                data_column_total=[]                
+                for n in range(0,len(data_name)):
+                    data_column_adjust=[]
+                    for m in range(0,len(data_name)):
+                        if m==i:
+                            data_column_adjust.append(data_name[n])
+                        else:
+                            data_column_adjust.append('')
+                    data_column_total.append(data_column_adjust)
+                data_pivot_2=pd.DataFrame(data_pivot_2.values,columns=pd.MultiIndex.from_tuples(data_column_total))                
                 data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
                 
         All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
