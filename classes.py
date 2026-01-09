@@ -44,6 +44,7 @@ class DataStructure:
                         ordered_temp=sorted(temp)
                     groupings.update({str(self.row_description.index[i]):ordered_temp})
         self.groupings = groupings
+        
         return self.groupings
         
 class StatsStructure(DataStructure): 

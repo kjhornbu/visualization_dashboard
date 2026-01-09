@@ -7,8 +7,11 @@ import re
 import math
 from classes import *
 import persistentData
+import copy
 
 ## HELPER FUNCTIONS FOR DATA I/O
+
+
 def check_header_rows(path):
     header_num = None
     n=0
@@ -45,18 +48,22 @@ def load_stats(path):
 
 
 ## MODIFICTIONS TO DATA BASED ON FILTER TYPE AND OTHER CRITERIA
+
+
 def collect_from_data(sheet,data_playwith):
-    series=sheet[persistentData.Plot_Configurations["myConfig"].x]
-    df = series.to_frame()
-    
-    # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
-    if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or  persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
+    if (persistentData.Plot_Configurations["myConfig"].filter['pval'] == None) or (persistentData.Plot_Configurations["myConfig"].filter['pval_BH'] == None):
+        # Need to make this work for the case where there may or may not be a None there for keys that may or may not be there
+        return data_playwith
+    else:
+        # Takes the (un)filtered GStats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
+        df=sheet[persistentData.Plot_Configurations["myConfig"].x].to_frame()
+
         merged_data = pd.merge(data_playwith,df,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
-    col_names=merged_data.columns
-    for col in col_names:
-        if not (isinstance(col, str) or (isinstance(col, tuple) and (isinstance(col[0],str)))):
-            merged_data.drop(columns=col,inplace=True)            
-    return merged_data
+
+        for col in merged_data.columns:
+            if not (isinstance(col, str) or (isinstance(col, tuple) and (isinstance(col[0],str)))):
+                merged_data.drop(columns=col,inplace=True)            
+        return merged_data
 
 def filter_stat_sheet(config_filter,sheet):
     reduced_sheet=sheet
@@ -76,50 +83,63 @@ def use_config_on_Data():
         Reduced_Stats=persistentData.Group_Stats.data 
     if  persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         plot_data=reduce_to_top(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
-    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv' or persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv' or persistentData.Plot_Configurations["myConfig"].pruse_sheet == 'group':
         data_playwith=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder)
         plot_data=collect_from_data(Reduced_Stats,data_playwith)
+        
     return plot_data
 
+
 #Helper files for creating proper filtering of data table and stat sheet
-def reduce_to_top(config_reduce,Reduced_Stats):
+
+def reduce_to_top(config_reduce,data):
+    
+    if (persistentData.Plot_Configurations["myConfig"].y == 'pval') or (persistentData.Plot_Configurations["myConfig"].y == 'pval_BH'):
+        #pvalues that are meaninful are small not large (basically only thing to do that)
+        ascending_dir=True
+    else:
+        ascending_dir=False
+
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         sort_on=config_reduce['sort_on']
     elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
         sort_on='sorting_column'
     
+    
     if config_reduce['top_amount'] == 'None':
-        return Reduced_Stats
+        return data
     elif config_reduce['top_amount'] == 'All':
-        Reduced_Stats = Reduced_Stats.sort_values(by=sort_on,key=abs,ascending=False)
-        return Reduced_Stats
+        data = data.sort_values(by=sort_on,key=abs,ascending=ascending_dir)
+        return data
     else:
-        Reduced_Stats = Reduced_Stats.sort_values(by=sort_on,key=abs,ascending=False)
-        #Make adjustment factors for repeating units
+        data = data.sort_values(by=sort_on,key=abs,ascending=ascending_dir)
+        
+        #Make adjustment factors for repeating units within the dataset 
         if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
             factor=1
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
-            factor=len(Reduced_Stats['variable'].unique())
+            factor=len(data['variable'].unique())
             #How many groupings to include
         
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
             #Need to just pull out of sheet because the n associated with each grouping is not defined simpliy
-            x_inSheet=Reduced_Stats[persistentData.Plot_Configurations["myConfig"].x].unique()            
+            x_inSheet=data[persistentData.Plot_Configurations["myConfig"].x].unique()            
             for n in range(int(config_reduce['top_amount'])):
-                select_Reduced_Stats=Reduced_Stats[Reduced_Stats[persistentData.Plot_Configurations["myConfig"].x]==x_inSheet[n]]
+                select_data=data[data[persistentData.Plot_Configurations["myConfig"].x]==x_inSheet[n]]
                 if n > 0:
-                    temp_Reduced_Stats=pd.concat([temp_Reduced_Stats, select_Reduced_Stats], ignore_index=True)
+                    temp_data=pd.concat([temp_data, select_data], ignore_index=True)
                 else:
-                    temp_Reduced_Stats=select_Reduced_Stats
+                    temp_data=select_data
                     
         if (persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats') or (persistentData.Plot_Configurations["myConfig"].use_sheet == 'group'):
-            return Reduced_Stats[0:(int(factor)*int(config_reduce['top_amount']))]
+            return data[0:(int(factor)*int(config_reduce['top_amount']))]
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
-            return temp_Reduced_Stats
+            return temp_data
         
 def pull_hemisphere_data():
-    data_work=persistentData.Indiv_Data.data
-    # Filter to desired hemisphere
+    # Filter to desired hemisphere in Indiv Data
+    data_work=copy.deepcopy(persistentData.Indiv_Data.data)
+    
     if persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'B':
         data_work=data_work[data_work['hemisphere_assignment']=='0']
     elif persistentData.Plot_Configurations["myConfig"].reduce_reorder['hemisphere'] == 'L':
@@ -160,6 +180,7 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
         columns_set=list(alt_columns)
         
         if len(alt_columns)>1:
+            # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
             for i in range(len(alt_columns)):
                 data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
                 data_name=data_pivot_2.columns
@@ -175,8 +196,8 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
                     
                 data_pivot_2.columns=data_column_total 
                 data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
-        
-        All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
+                
+        All_Group_Entries=copy.deepcopy(persistentData.Plot_Configurations["myConfig"].groups_to_include) # Using a Deep copy so we have an independent group of gorups to include to work off of for this
         
         for i in range(len(All_Group_Entries)):
             data_dict=All_Group_Entries[i]
@@ -184,8 +205,10 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
             adjusted_dict={}
             for j,key in enumerate(alt_columns_keys):
                 adjusted_dict.update({key:data_dict.pop(key)})
-            All_Group_Entries_v2.append(adjusted_dict)     
+            All_Group_Entries_v2.append(adjusted_dict)
+            
         All_Group_Entries=All_Group_Entries_v2
+        
     else:
         data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
         All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
@@ -197,21 +220,20 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
         else:
             data_values=tuple(data_dict.values())
             
-        frames.append(data_pivot[data_values]) # breaks here for indiv group putting back together... it needs the tuple data values
+        frames.append(data_pivot[data_values])
         
     data_playwith = pd.concat(frames, axis=1)
     max_per_row = data_playwith.max(axis='columns')
     min_per_row = data_playwith.min(axis='columns')
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
-
+    
     return data_playwith
     
 def prep_Data_Indiv():
     frames=[]
     alt_Key_Compiler=[]
-    
     for i in range(len(persistentData.Plot_Configurations["myConfig"].groups_to_include)):
-        data_work=pull_hemisphere_data()  
+        data_work=pull_hemisphere_data()
         data_dict=persistentData.Plot_Configurations["myConfig"].groups_to_include[i]
         data_dict_keys=data_dict.keys()
         data_values=tuple(data_dict.values())
@@ -225,7 +247,7 @@ def prep_Data_Indiv():
         temp_work=temp_work.rename(columns={persistentData.Plot_Configurations["myConfig"].y:data_values})
         melt_plot_data=pd.melt(temp_work,id_vars=persistentData.Plot_Configurations["myConfig"].x,value_vars=temp_work.columns[1:])
         frames.append(melt_plot_data)
-        
+
     data_playwith = pd.concat(frames, axis=0)  #This combines so each specimen's region entry for a given contrast is relayed (231*Nspecimen rows)  
     data_playwith_Group=prep_Data_Group(True,dict.fromkeys(alt_Key_Compiler)) # we get the grouped data from the indiv data (don't use group because there is not a 1 to 1 for every data term in the group data table for the subject data table)
     
@@ -234,9 +256,11 @@ def prep_Data_Indiv():
     
     merged_data = pd.merge(data_playwith,data_playwith_GroupReduced,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager erro -- We are putting group mean responses onto the subject data so we can sort for plotting 
     return merged_data
-    
+
+
 ## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
 # These are all the parts needed to assign configuration for plotting
+
 
 def make_axis_input(data_options,id_name):
     value_name= f"Select Data for {id_name}-axis"
@@ -248,7 +272,7 @@ def make_axis_input(data_options,id_name):
     return dropdown
 
 def make_radiobutton_pvalue():
-    radio=html.Div([html.Label("Filter by Significance:  ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(options={'NONE':'NONE','pval':'p-value','pval_BH':'p-value with BH correction'}, inline=True, id='radio_pval')])
+    radio=html.Div([html.Label("Filter by Significance (NOTE THE HEMISPHERE OF Group_Statistical_Results FILE):  ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(options={'NONE':'NONE','pval':'p-value','pval_BH':'p-value with BH correction'}, inline=True, id='radio_pval')])
     return radio
 
 def make_radiobutton_topN():
@@ -256,7 +280,7 @@ def make_radiobutton_topN():
     return radio
 
 def make_hemisphere_selector():
-    hemisphere=html.Div([html.Label("Select Hemisphere(s) to Include: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'All':'All','B':'Bilateral','L':'Left','R':'Right'}, inline=True,id='hemisphere')])
+    hemisphere=html.Div([html.Label("Select Hemisphere(s) to Include: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'B':'Bilateral','L':'Left','R':'Right'}, inline=True,id='hemisphere')])
     return hemisphere
 
 def make_slider(slider_input,id_name,label):
@@ -279,6 +303,7 @@ def make_grouping_selector(groups_to_include):
             dropdown_options.append({'label':groups_to_include[column_name[i]][j], 'value':groups_to_include[column_name[i]][j]})       
         dropdown.update({column_name[i]:{'options': dropdown_options}})
     group_datatable=dash_table.DataTable(id='group_selection_table', columns = columns, data=[data_row], dropdown=dropdown, editable=True, row_deletable=True)
+
     return group_datatable
     
 def make_go_button():
@@ -298,8 +323,10 @@ def make_chart(plot_data):
                           ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     return chart
 
+
 ## FIGURE CONFIG INPUT BUILDER -- HELPER FUNCTIONS
 # These put together all the components into top/bottom divs for visualization
+
 
 def top_config_input():
     radioPval=make_radiobutton_pvalue() #DCC

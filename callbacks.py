@@ -7,8 +7,10 @@ from helper_functions import *
 from classes import *
 import persistentData
 
-# All your callbacks have to be between the end of the app layout and the app run call to work properly
+
 ## OBTAINING DATA CALLBACKS
+
+
 @callback(Output("loading-stat_sheet", "children"),
           Input(component_id='group_stats_path',component_property='value'))
 def update_input_stats (path):
@@ -33,6 +35,10 @@ def update_input_indiv_data (path):
         persistentData.Indiv_Data = load_data(path,mode='indiv')
     return
 
+
+## ASSIGNING MANUAL VERSUS PROMPT INPUT
+
+
 @callback(Output(component_id='prompt-container',component_property='children'),
           Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),
           Output(component_id='output-container', component_property='children', allow_duplicate=True),
@@ -47,7 +53,25 @@ def make_manual_versus_prompt_input(input_mode):
         return prompt_input,[],[]
     else:
         return None,[],[]
+    
+    
+ ## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS
 
+
+@callback(Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),
+          Input(component_id='main_plot_table',component_property='value'),
+          prevent_initial_call=True)
+def set_figure_to_output_Manual(select_table_4_plotting):
+    persistentData.Plot_Configurations["myConfig"].use_sheet=select_table_4_plotting
+    if persistentData.Plot_Configurations["myConfig"].use_sheet is not None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
+        return full_figure_config_input()
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet is None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
+        message= 'Make sure to --  "Select Main Table for Visualization"'
+        return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
+    else:
+        message= 'Make Sure All Data Files Are Loaded and Exist At Path Location'
+        return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
+     
 @callback(Output(component_id='output-container', component_property='children', allow_duplicate=True),
           Input(component_id='prompt_input', component_property='value'),prevent_initial_call=True)
 def set_figure_to_output_Prompt(prompt_text):
@@ -63,7 +87,9 @@ def set_figure_to_output_Prompt(prompt_text):
         return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Prompt", value=message))])]
     return None
 
-## GETTER FROM HTML COMPONENTS
+
+## GETTERS FOR HTML COMPONENTS IN CONFIG SETTING
+
 @callback(Input(component_id='radio_pval', component_property='value'))
 def get_radiobutton_pvalue(radio_pval):
     removed_value = persistentData.Plot_Configurations["myConfig"].filter.pop('pval',None)
@@ -118,6 +144,32 @@ def get_hemisphere(hemisphere_value):
 def get_desired_grouping(rows, columns):
     persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
     return
+    
+@callback(
+    Output('group_selection_table', 'data'),
+    Input('add-rows-button', 'n_clicks'),
+    State('group_selection_table', 'data'),
+    State('group_selection_table', 'columns'))
+def add_row(n_clicks, rows, columns):
+    if n_clicks > 0:
+        rows.append({c['id']: '-' for c in columns})
+    return rows
+
+
+## OUTPUT TO CSV FILE SETUP
+
+
+@callback(
+    Output("export-data-grid", "exportDataAsCsv"),
+    Input("csv-button", "n_clicks"),
+)
+def export_data_as_csv(n_clicks):
+    if n_clicks:
+        return True
+    return False
+
+
+## MAKE ACTUAL PLOT
 
 @callback(Output(component_id='output-container',component_property='children', allow_duplicate=True),
           Input(component_id='go_button',component_property='n_clicks'),prevent_initial_call=True)
@@ -129,42 +181,5 @@ def make_graph(isgo):
         return [chart,html.Div(className='chart-item', children=[html.Div(children=download_button)],style={'display':'grid','width': '100%'})]
     else:
         return None
-    
-@callback(Input(component_id='group_selections', component_property='value'))
-def get_grouping_selector(groups_to_include):
-    persistentData.Plot_Configurations["myConfig"].groups_to_include=groups_to_include
-    return
 
-@callback(
-    Output('group_selection_table', 'data'),
-    Input('add-rows-button', 'n_clicks'),
-    State('group_selection_table', 'data'),
-    State('group_selection_table', 'columns'))
-def add_row(n_clicks, rows, columns):
-    if n_clicks > 0:
-        rows.append({c['id']: '-' for c in columns})
-    return rows
 
-@callback(
-    Output("export-data-grid", "exportDataAsCsv"),
-    Input("csv-button", "n_clicks"),
-)
-def export_data_as_csv(n_clicks):
-    if n_clicks:
-        return True
-    return False
-
-## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS    
-@callback(Output(component_id='prompt-knobs-container', component_property='children', allow_duplicate=True),
-          Input(component_id='main_plot_table',component_property='value'),
-          prevent_initial_call=True)
-def set_figure_to_output_Manual(select_table_4_plotting):
-    persistentData.Plot_Configurations["myConfig"].use_sheet=select_table_4_plotting
-    if persistentData.Plot_Configurations["myConfig"].use_sheet is not None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
-        return full_figure_config_input()
-    elif persistentData.Plot_Configurations["myConfig"].use_sheet is None  and isinstance(persistentData.Indiv_Data, DataStructure) and isinstance(persistentData.Group_Data, DataStructure) and isinstance(persistentData.Group_Stats, StatsStructure):
-        message= 'Make sure to --  "Select Main Table for Visualization"'
-        return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
-    else:
-        message= 'Make Sure All Data Files Are Loaded and Exist At Path Location'
-        return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
