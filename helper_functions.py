@@ -48,14 +48,7 @@ def load_stats(path):
 def collect_from_data(sheet,data_playwith):
     series=sheet[persistentData.Plot_Configurations["myConfig"].x]
     df = series.to_frame()
-    #series_name=[]
-    #for n in range(0,len(data_playwith.columns[0])):
-    #    if n==0:
-    #        series_name.append(series.name)
-    #    else:
-    #        series_name.append('')
-    #
-    #df = pd.DataFrame(series.values,columns=pd.MultiIndex.from_tuples([tuple(series_name)]))
+    
     # Takes the (un)filtered Group Stats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'group' or  persistentData.Plot_Configurations["myConfig"].use_sheet =='indiv':
         merged_data = pd.merge(data_playwith,df,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
@@ -102,8 +95,28 @@ def reduce_to_top(config_reduce,Reduced_Stats):
         return Reduced_Stats
     else:
         Reduced_Stats = Reduced_Stats.sort_values(by=sort_on,key=abs,ascending=False)
-        return Reduced_Stats[0:int(config_reduce['top_amount'])]
-
+        #Make adjustment factors for repeating units
+        if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+            factor=1
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+            factor=len(Reduced_Stats['variable'].unique())
+            #How many groupings to include
+        
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+            #Need to just pull out of sheet because the n associated with each grouping is not defined simpliy
+            x_inSheet=Reduced_Stats[persistentData.Plot_Configurations["myConfig"].x].unique()            
+            for n in range(int(config_reduce['top_amount'])):
+                select_Reduced_Stats=Reduced_Stats[Reduced_Stats[persistentData.Plot_Configurations["myConfig"].x]==x_inSheet[n]]
+                if n > 0:
+                    temp_Reduced_Stats=pd.concat([temp_Reduced_Stats, select_Reduced_Stats], ignore_index=True)
+                else:
+                    temp_Reduced_Stats=select_Reduced_Stats
+                    
+        if (persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats') or (persistentData.Plot_Configurations["myConfig"].use_sheet == 'group'):
+            return Reduced_Stats[0:(int(factor)*int(config_reduce['top_amount']))]
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+            return temp_Reduced_Stats
+        
 def pull_hemisphere_data():
     data_work=persistentData.Indiv_Data.data
     # Filter to desired hemisphere
@@ -150,19 +163,19 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
             for i in range(len(alt_columns)):
                 data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
                 data_name=data_pivot_2.columns
-                
                 data_column_total=[]                
                 for n in range(0,len(data_name)):
                     data_column_adjust=[]
                     for m in range(0,len(data_name)):
-                        if m==i:
-                            data_column_adjust.append(data_name[n])
+                        if n==i:
+                            data_column_adjust.append(data_name[m])
                         else:
-                            data_column_adjust.append('')
+                            data_column_adjust.append('-')
                     data_column_total.append(data_column_adjust)
-                data_pivot_2=pd.DataFrame(data_pivot_2.values,columns=pd.MultiIndex.from_tuples(data_column_total))                
+                    
+                data_pivot_2.columns=data_column_total 
                 data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
-                
+        
         All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
         
         for i in range(len(All_Group_Entries)):
@@ -187,7 +200,6 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
         frames.append(data_pivot[data_values]) # breaks here for indiv group putting back together... it needs the tuple data values
         
     data_playwith = pd.concat(frames, axis=1)
-    
     max_per_row = data_playwith.max(axis='columns')
     min_per_row = data_playwith.min(axis='columns')
     data_playwith['sorting_column']=abs(max_per_row-min_per_row)
@@ -215,10 +227,12 @@ def prep_Data_Indiv():
         frames.append(melt_plot_data)
         
     data_playwith = pd.concat(frames, axis=0)  #This combines so each specimen's region entry for a given contrast is relayed (231*Nspecimen rows)  
-    
     data_playwith_Group=prep_Data_Group(True,dict.fromkeys(alt_Key_Compiler)) # we get the grouped data from the indiv data (don't use group because there is not a 1 to 1 for every data term in the group data table for the subject data table)
-    merged_data = pd.merge(data_playwith,data_playwith_Group,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager erro -- We are putting group mean responses onto the subject data so we can sort for plotting
     
+    data_playwith_GroupReduced=data_playwith_Group['sorting_column'] # grab the sorting column because we only want that don't need what came into it.
+    data_playwith_GroupReduced.name=('sorting_column') # make sure its at a first level by reassigning like this
+    
+    merged_data = pd.merge(data_playwith,data_playwith_GroupReduced,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager erro -- We are putting group mean responses onto the subject data so we can sort for plotting 
     return merged_data
     
 ## FIGURE LAYOUT BUILDER -- HELPER FUNCTIONS
@@ -276,13 +290,11 @@ def make_add_button():
     return add_button
 
 def make_chart(plot_data):
+    set_symbol_sequence=['circle']
     if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y=persistentData.Plot_Configurations["myConfig"].y,symbol=persistentData.Plot_Configurations["myConfig"].x,symbol_sequence=set_symbol_sequence),style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     else:
-        
-        ### TO DO: Broke Group data plotting --- probably the wrong data type now since I am doing 2 things at once
-        ### TO DO: Need to allow all instances of a given region not the explicit 10 or 20 rows. -- breaks most for the 
-        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',labels={"value": persistentData.Plot_Configurations["myConfig"].y})
+        chart = dcc.Graph(id ='output-graph', figure=px.scatter(plot_data,x=persistentData.Plot_Configurations["myConfig"].x, y='value',color='variable',symbol='variable',symbol_sequence=set_symbol_sequence,labels={"value": persistentData.Plot_Configurations["myConfig"].y})
                           ,style={'width': '50vw', 'height': '50vh'},config={"toImageButtonOptions":{"filename":persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y, "format":'svg'}})
     return chart
 
