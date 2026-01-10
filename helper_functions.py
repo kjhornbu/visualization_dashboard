@@ -1,4 +1,5 @@
 # In[ ]:
+
 from dash import Dash,dcc, html, dash_table, Input, Output, State
 import pandas as pd
 import numpy as np
@@ -8,6 +9,7 @@ import math
 from classes import *
 import persistentData
 import copy
+
 
 ## HELPER FUNCTIONS FOR DATA I/O
 
@@ -51,18 +53,16 @@ def load_stats(path):
 
 
 def collect_from_data(sheet,data_playwith):
-    if (persistentData.Plot_Configurations["myConfig"].filter['pval'] == None) or (persistentData.Plot_Configurations["myConfig"].filter['pval_BH'] == None):
-        # Need to make this work for the case where there may or may not be a None there for keys that may or may not be there
+    if (persistentData.Plot_Configurations["myConfig"].filter.get('pval') == None) or (persistentData.Plot_Configurations["myConfig"].filter.get('pval_BH') == None):
         return data_playwith
     else:
         # Takes the (un)filtered GStats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
         df=sheet[persistentData.Plot_Configurations["myConfig"].x].to_frame()
-
         merged_data = pd.merge(data_playwith,df,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False) # The order HAS TO BE this if you switch it you get a Requested axis not found in manager error
 
         for col in merged_data.columns:
             if not (isinstance(col, str) or (isinstance(col, tuple) and (isinstance(col[0],str)))):
-                merged_data.drop(columns=col,inplace=True)            
+                merged_data.drop(columns=col,inplace=True)         
         return merged_data
 
 def filter_stat_sheet(config_filter,sheet):

@@ -4,8 +4,6 @@ import pandas as pd
 import re
 
 
-## these don't work with the multipage layout need to have dcc store used adn not rely on global setting
-
 ## ALL CLASS DEFINTIONS
 class PlotConfig: 
     def __init__(self,use_sheet:str=None,x:str=None,y:str=None,groups_to_include:dict={},config_reducereorder:dict={},config_filter:dict={}):
