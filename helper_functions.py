@@ -53,8 +53,8 @@ def load_stats(path):
 
 
 def collect_from_data(sheet,data_playwith):
-    if (persistentData.Plot_Configurations["myConfig"].filter.get('pval') == None) or (persistentData.Plot_Configurations["myConfig"].filter.get('pval_BH') == None):
-        return data_playwith
+    if (persistentData.Plot_Configurations["myConfig"].filter.get('pval') == None):
+        return data_playwith #-- This would just not apply a filter in the case of indicating that there is no Filtering... but we want it to be dumb so no extra problems. 
     else:
         # Takes the (un)filtered GStats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
         df=sheet[persistentData.Plot_Configurations["myConfig"].x].to_frame()
@@ -83,7 +83,7 @@ def use_config_on_Data():
         Reduced_Stats=persistentData.Group_Stats.data 
     if  persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         plot_data=reduce_to_top(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
-    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv' or persistentData.Plot_Configurations["myConfig"].pruse_sheet == 'group':
+    elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv' or persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
         data_playwith=reduce_to_top_Data(persistentData.Plot_Configurations["myConfig"].reduce_reorder)
         plot_data=collect_from_data(Reduced_Stats,data_playwith)
         
@@ -272,7 +272,7 @@ def make_axis_input(data_options,id_name):
     return dropdown
 
 def make_radiobutton_pvalue():
-    radio=html.Div([html.Label("Filter by Significance (NOTE THE HEMISPHERE OF Group_Statistical_Results FILE):  ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(options={'NONE':'NONE','pval':'p-value','pval_BH':'p-value with BH correction'}, inline=True, id='radio_pval')])
+    radio=html.Div([html.Label("Filter by Significance (NOTE HEMISPHERE OF Group_Statistical_Results FILE):  ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems(options={'NONE':'NONE','pval':'p-value','pval_BH':'p-value with BH correction'}, inline=True, id='radio_pval')])
     return radio
 
 def make_radiobutton_topN():
@@ -280,7 +280,7 @@ def make_radiobutton_topN():
     return radio
 
 def make_hemisphere_selector():
-    hemisphere=html.Div([html.Label("Select Hemisphere(s) to Include: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'B':'Bilateral','L':'Left','R':'Right'}, inline=True,id='hemisphere')])
+    hemisphere=html.Div([html.Label("Select Hemisphere to Include: ", style={'color':'#00539B', 'font-size':18,'font-family':'Arial'}),dcc.RadioItems({'B':'Bilateral','L':'Left','R':'Right'}, inline=True,id='hemisphere')])
     return hemisphere
 
 def make_slider(slider_input,id_name,label):
