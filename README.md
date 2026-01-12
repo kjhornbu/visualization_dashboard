@@ -1,6 +1,7 @@
 Right now it is still “hard coded” with the paths to 18.gaj.42 for James and I, but you can change them after initial loading.
 
 Steps to Utilize:
+
 1- You input in the paths to the Group Data Table, Subject Data Table, and the Group Statistical Results. The data then loads into the system. There is a loading icon that runs until the system has loaded the data.
 
 2- Right now, you can only select the “Manual” Mode. That means you will need to select some parts of the configuration to plot what you want.
