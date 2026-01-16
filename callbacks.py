@@ -6,6 +6,7 @@ import os
 from helper_functions import *
 from classes import *
 import persistentData
+import json
 
 
 ## OBTAINING DATA CALLBACKS
@@ -160,14 +161,28 @@ def add_row(n_clicks, rows, columns):
 
 
 @callback(
-    Output("export-data-grid", "exportDataAsCsv"),
+    Output("download_data", "data"),
     Input("csv-button", "n_clicks"),
+    prevent_initial_call=True
 )
 def export_data_as_csv(n_clicks):
-    if n_clicks:
-        return True
-    return False
-
+    if n_clicks >0:
+        
+        if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
+            persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Group_Stats.path
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
+            persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Indiv_Data.path
+        elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
+            persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Group_Data.path
+        
+        config_out=json.dumps(persistentData.Plot_Configurations["myConfig"].__dict__)
+        data_out=persistentData.Plot_Configurations['Data'].to_csv()
+        data_filename=persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y+"_data_for_fig.csv"
+        
+        config_data_out = f"#{config_out}\n{data_out}"
+        return dict(content=config_data_out, filename=data_filename)
+    else:
+        return None
 
 ## MAKE ACTUAL PLOT
 
@@ -176,9 +191,14 @@ def export_data_as_csv(n_clicks):
 def make_graph(isgo): 
     if "go_button" == ctx.triggered_id and isgo>0:
         plot_data_out=use_config_on_Data()
+        persistentData.Plot_Configurations['Data']=plot_data_out
         chart=make_chart(plot_data_out)
-        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)      
-        return [chart,html.Div(className='chart-item', children=[html.Div(children=download_button)],style={'display':'grid','width': '100%'})]
+        
+        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)  
+        download_link=dcc.Download(id="download_data")
+        download=html.Div([download_button,download_link])       
+        
+        return [chart,html.Div(className='chart-item', children=[html.Div(children=download)],style={'display':'grid','width': '100%'})]
     else:
         return None
 

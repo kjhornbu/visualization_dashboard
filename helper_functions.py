@@ -36,7 +36,7 @@ def load_data(path,mode):
     data_col_idx=data.iloc[0]
     data_comments=data.iloc[1]
     data = data.drop([data.index[0],data.index[1]]).reset_index()
-    myData=DataStructure(row_idx = data_col_idx,row_description = data_comments,data = data,mode=mode) # Create Data (indiv or Group) class
+    myData=DataStructure(path=path,row_idx = data_col_idx,row_description = data_comments,data = data,mode=mode) # Create Data (indiv or Group) class
     return myData
 
 def load_stats(path):
@@ -45,7 +45,7 @@ def load_stats(path):
     stats_col_idx=stats.iloc[0]
     stats_comments=stats.iloc[1]
     stats = stats.drop([stats.index[0],stats.index[1]]).reset_index()
-    myStats = StatsStructure(row_idx = stats_col_idx,row_description = stats_comments,data = stats)
+    myStats = StatsStructure(path=path,row_idx = stats_col_idx,row_description = stats_comments,data = stats)
     return myStats
 
 
@@ -177,12 +177,15 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
     if from_indiv:
         data_work=pull_hemisphere_data()
         data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
+        print('Here')
         columns_set=list(alt_columns)
         
         if len(alt_columns)>1:
             # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
             for i in range(len(alt_columns)):
                 data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
+                print('No We at Pivot 2')
+
                 data_name=data_pivot_2.columns
                 data_column_total=[]                
                 for n in range(0,len(data_name)):
@@ -195,6 +198,7 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
                     data_column_total.append(data_column_adjust)
                     
                 data_pivot_2.columns=data_column_total 
+                print('Right Before Merge')
                 data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
                 
         All_Group_Entries=copy.deepcopy(persistentData.Plot_Configurations["myConfig"].groups_to_include) # Using a Deep copy so we have an independent group of gorups to include to work off of for this

@@ -22,12 +22,13 @@ class PlotConfig:
         
         return isValid
 class DataStructure:
-    def __init__(self,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame):
+    def __init__(self,path:str,row_idx:pd.Series,row_description:pd.Series,mode:str,data: pd.DataFrame):
         self.row_idx = row_idx
         self.row_description = row_description
         self.data = data
         self.mode = mode
         self.groupings = self.set_groupings()
+        self.path=path
         
     def set_groupings(self):
         groupings = {}
@@ -47,8 +48,8 @@ class DataStructure:
         
 class StatsStructure(DataStructure): 
     # Should this be more connected to the data struture, where we use what is found in one, to assume(and then validate) is present in the other?
-    def __init__(self,row_idx:pd.Series,row_description:pd.Series,data: pd.DataFrame):
-        DataStructure.__init__(self,row_idx=row_idx,row_description=row_description,mode='stats',data=data)
+    def __init__(self,path:str,row_idx:pd.Series,row_description:pd.Series,data: pd.DataFrame):
+        DataStructure.__init__(self,path=path,row_idx=row_idx,row_description=row_description,mode='stats',data=data)
         [self.sov_options,self.contrast_options]= self.set_stats_groupings()
         
     def set_stats_groupings(self):
