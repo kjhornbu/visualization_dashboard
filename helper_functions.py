@@ -177,14 +177,12 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
     if from_indiv:
         data_work=pull_hemisphere_data()
         data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
-        print('Here')
         columns_set=list(alt_columns)
         
         if len(alt_columns)>1:
             # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
             for i in range(len(alt_columns)):
                 data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
-                print('No We at Pivot 2')
 
                 data_name=data_pivot_2.columns
                 data_column_total=[]                
@@ -198,7 +196,6 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
                     data_column_total.append(data_column_adjust)
                     
                 data_pivot_2.columns=data_column_total 
-                print('Right Before Merge')
                 data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
                 
         All_Group_Entries=copy.deepcopy(persistentData.Plot_Configurations["myConfig"].groups_to_include) # Using a Deep copy so we have an independent group of gorups to include to work off of for this
