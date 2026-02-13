@@ -49,7 +49,7 @@ def make_manual_versus_prompt_input(input_mode):
         table_type_dropdown=dcc.Dropdown(options={'stats':'Group Statistical Results','group':'Group Data Table','indiv': 'Subject Data Table'}, placeholder='Select Main Table for Visualization', id='main_plot_table')
         return table_type_dropdown,[],[]
     elif input_mode =='Prompt':
-        prompt_input=dcc.Textarea(value=None,placeholder='Input Prompt for Figure Generation, such as "Show me the Top 10 significant FA regions for Age_Class"',id='prompt_input',style={'width': '100%'})
+        prompt_input=dcc.Textarea(value=None,placeholder='CURRENTLY NOT ACTIVE!! ~~ Input Prompt for Figure Generation, such as "Show me the Top 10 significant FA regions for Age_Class"',id='prompt_input',style={'width': '100%'})
         
         return prompt_input,[],[]
     else:

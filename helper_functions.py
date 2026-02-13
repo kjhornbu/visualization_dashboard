@@ -177,27 +177,11 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
     if from_indiv:
         data_work=pull_hemisphere_data()
         data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
+        
+        
         columns_set=list(alt_columns)
         
-        if len(alt_columns)>1:
-            # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
-            for i in range(len(alt_columns)):
-                data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=(columns_set[i]))
-
-                data_name=data_pivot_2.columns
-                data_column_total=[]                
-                for n in range(0,len(data_name)):
-                    data_column_adjust=[]
-                    for m in range(0,len(data_name)):
-                        if n==i:
-                            data_column_adjust.append(data_name[m])
-                        else:
-                            data_column_adjust.append('-')
-                    data_column_total.append(data_column_adjust)
-                    
-                data_pivot_2.columns=data_column_total 
-                data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
-                
+        #Setup the All_group_Entries
         All_Group_Entries=copy.deepcopy(persistentData.Plot_Configurations["myConfig"].groups_to_include) # Using a Deep copy so we have an independent group of gorups to include to work off of for this
         
         for i in range(len(All_Group_Entries)):
@@ -210,10 +194,55 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
             
         All_Group_Entries=All_Group_Entries_v2
         
+        if len(alt_columns)>1:
+            # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
+            # Need combinations now can't just do the single add here.... how am I going to put that into here. 
+        
+            for i in range(len(All_Group_Entries)):
+                #Push multiple combinations via the columns set then continue 
+                alt_Key_Compiler=[]
+                temp_Entries=All_Group_Entries_v2[i]
+                temp_Entries_keys=temp_Entries.keys()
+                temp_Entries_values=tuple(temp_Entries.values())
+
+                for j,key in enumerate(temp_Entries_keys):
+                    if temp_Entries[key] != '-':
+                        data_work=data_work[data_work[key]==temp_Entries[key]]
+                        alt_Key_Compiler.append(key)
+                        
+                data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=alt_Key_Compiler)                
+                data_columns=data_pivot_2.columns
+                data_name=data_pivot_2.columns.names
+                data_name_full=data_pivot.columns.names
+
+                data_column_adjust=[]
+                data_column_total=[]
+                count=0
+                print(data_name_full)
+                print(data_name)
+                for n,name in enumerate(data_name_full):
+                    count=0
+                    for m,name_2 in enumerate(data_name):
+                        if name == name_2:
+                            count=1
+                            data_column_adjust.append(data_columns[i][m])
+                    if count != 1:
+                        data_column_adjust.append('-')
+                                
+                data_column_total.append(data_column_adjust)
+                
+                print(data_column_total)
+                data_pivot_2.columns=data_column_total
+                data_pivot_2.columns.names=data_name_full
+
+                data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
+                print(data_data_pivot)
+                                 
     else:
         data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
-        All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include
-    
+        All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include #These groups to include has the additional groups which we don't have
+        
+    print(data_pivot.columns.names)
     for i in range(len(All_Group_Entries)):
         data_dict=All_Group_Entries[i]
         if len(data_dict) == 1:
