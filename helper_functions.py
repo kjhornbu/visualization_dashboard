@@ -176,73 +176,81 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
     All_Group_Entries_v2=[]
     if from_indiv:
         data_work=pull_hemisphere_data()
-        data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(alt_columns))
-        
-        
-        columns_set=list(alt_columns)
-        
+        data_name_full=list(alt_columns)
+        data_pivot = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=data_name_full)
         #Setup the All_group_Entries
         All_Group_Entries=copy.deepcopy(persistentData.Plot_Configurations["myConfig"].groups_to_include) # Using a Deep copy so we have an independent group of gorups to include to work off of for this
         
+        full_alt_Key_Complier=[]
         for i in range(len(All_Group_Entries)):
             data_dict=All_Group_Entries[i]
             alt_columns_keys=alt_columns.keys()
             adjusted_dict={}
+            alt_Key_Compiler=[]
             for j,key in enumerate(alt_columns_keys):
                 adjusted_dict.update({key:data_dict.pop(key)})
+                if adjusted_dict[key] != '-':
+                    alt_Key_Compiler.append(key)
+            full_alt_Key_Complier.append(alt_Key_Compiler)        
             All_Group_Entries_v2.append(adjusted_dict)
-            
-        All_Group_Entries=All_Group_Entries_v2
         
+        All_Group_Entries=All_Group_Entries_v2
+        unique_tuples = set(tuple(inner_list) for inner_list in full_alt_Key_Complier)
+        # Convert tuples back to lists
+        unique_full_alt_Key_Complier = [list(tup) for tup in unique_tuples]
+
+        #Chekc for unique_full_alt_Key_Complier == to the data_name_full so don't double up creating things
+        for i in range(len(unique_full_alt_Key_Complier)):
+            if data_name_full in unique_full_alt_Key_Complier[i]:
+                unique_full_alt_Key_Complier[i].pop(1)
+
         if len(alt_columns)>1:
             # Make multiple extra rows with the - and stuff to fill out what is needed in combinations
             # Need combinations now can't just do the single add here.... how am I going to put that into here. 
         
-            for i in range(len(All_Group_Entries)):
+            for i in range(len(unique_full_alt_Key_Complier)):
                 #Push multiple combinations via the columns set then continue 
                 alt_Key_Compiler=[]
                 temp_Entries=All_Group_Entries_v2[i]
                 temp_Entries_keys=temp_Entries.keys()
                 temp_Entries_values=tuple(temp_Entries.values())
-
+                
                 for j,key in enumerate(temp_Entries_keys):
                     if temp_Entries[key] != '-':
-                        data_work=data_work[data_work[key]==temp_Entries[key]]
+                        #data_work=data_work[data_work[key]==temp_Entries[key]] # This is the line that is removing the data in data_work and killing me otherwise.  
                         alt_Key_Compiler.append(key)
-                        
-                data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=alt_Key_Compiler)                
+
+                data_pivot_2 = pd.pivot_table(data_work, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=alt_Key_Compiler)
+
                 data_columns=data_pivot_2.columns
-                data_name=data_pivot_2.columns.names
-                data_name_full=data_pivot.columns.names
-
-                data_column_adjust=[]
+                data_name=data_pivot_2.columns.names                
                 data_column_total=[]
-                count=0
-                print(data_name_full)
-                print(data_name)
-                for n,name in enumerate(data_name_full):
-                    count=0
-                    for m,name_2 in enumerate(data_name):
-                        if name == name_2:
-                            count=1
-                            data_column_adjust.append(data_columns[i][m])
-                    if count != 1:
-                        data_column_adjust.append('-')
-                                
-                data_column_total.append(data_column_adjust)
                 
-                print(data_column_total)
-                data_pivot_2.columns=data_column_total
-                data_pivot_2.columns.names=data_name_full
+                for col in range(len(data_columns)):
+                    data_column_adjust=[]
+                    for n,name in enumerate(data_name_full):
+                        count=0
+                        for m,name_2 in enumerate(data_name):
+                            if (name == name_2) and (count != 1):
+                                count=1
+                                if len(alt_Key_Compiler)>1:
+                                    data_column_adjust.append(data_columns[col][m])
+                                else:
+                                    data_column_adjust.append(data_columns[m])
+                        if count != 1:
+                            data_column_adjust.append('-')
+                    data_column_total.append(tuple(data_column_adjust))
 
-                data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',copy=False)
-                print(data_data_pivot)
-                                 
+                column_name=pd.MultiIndex.from_tuples(data_column_total,names=data_name_full)
+                data_pivot_2.columns=column_name
+                data_pivot=data_pivot.join(data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',lsuffix='', rsuffix='')
+                #this merge is creating the nightmare which is not removing duplicates in teh merge once generated
+    
+        print(data_pivot.columns)    
     else:
         data_pivot = pd.pivot_table(persistentData.Group_Data.data, values=persistentData.Plot_Configurations["myConfig"].y, index=persistentData.Plot_Configurations["myConfig"].x, columns=list(persistentData.Group_Data.groupings.keys()))
         All_Group_Entries=persistentData.Plot_Configurations["myConfig"].groups_to_include #These groups to include has the additional groups which we don't have
         
-    print(data_pivot.columns.names)
     for i in range(len(All_Group_Entries)):
         data_dict=All_Group_Entries[i]
         if len(data_dict) == 1:
