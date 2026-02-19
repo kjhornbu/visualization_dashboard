@@ -1,5 +1,5 @@
 # In[ ]:
-from dash import Dash, dcc, html, dash_table,Input, Output, callback,ctx
+from dash import Dash, dcc, html, dash_table,Input, Output, callback,ctx,Patch
 import pandas as pd
 import time
 import os
@@ -203,3 +203,9 @@ def make_graph(isgo):
         return None
 
 
+"""
+Look at this for potential to have marker sizes change based on zoom, but this appears to be tied to browser size/zoom not the zoom on the graph
+
+https://community.plotly.com/t/making-marker-size-dynamic-when-changing-browser-sizes/82260
+
+""" 

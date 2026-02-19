@@ -50,7 +50,7 @@ app.layout = html.Div([
     ],id='config-container'),
     html.Div([html.Div(id='output-container', className='chart-grid')])
 ],id='main-container')
-    
+
     ## RUN THE DASH APP
 if __name__ == '__main__':
     app.run(debug=True)
