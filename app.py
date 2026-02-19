@@ -12,10 +12,12 @@ from persistentData import default_files
 
     ## RUN THE DASH APP
 if __name__ == '__main__':
-    if len(sys.argv) >= 4:
-        default_files["Result"]=sys.argv[1]
-        default_files["Group"]=sys.argv[2]
-        default_files["Subject"]=sys.argv[3]
+    port_address=8050
+    if len(sys.argv) >= 5:
+        port_address=sys.argv[1]
+        default_files["Result"]=sys.argv[2]
+        default_files["Group"]=sys.argv[3]
+        default_files["Subject"]=sys.argv[4]
 
     ## INITALIZE THE DASH APP
     app = Dash(__name__, suppress_callback_exceptions=True)
@@ -59,4 +61,5 @@ if __name__ == '__main__':
         html.Div([html.Div(id='output-container', className='chart-grid')])
     ],id='main-container')
 
-    app.run(debug=True)
+    
+    app.run(debug=True, port=port_address)
