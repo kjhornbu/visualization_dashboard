@@ -215,11 +215,6 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
                 data_name=data_pivot_2.columns.names                
                 data_column_total=[]
 
-                print(data_columns)
-                print(len(data_columns))
-
-                print(data_name)
-
                 for col in range(len(data_columns)):
                     data_column_adjust=[]
                     for n,name in enumerate(data_name_full):
@@ -230,7 +225,6 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
                                 if len(unique_full_alt_Key_Complier[i])>1:
                                     data_column_adjust.append(data_columns[col][m])
                                 else:
-                                    print('I a special case')
                                     data_column_adjust.append(data_columns[col])
                         if count != 1:
                             data_column_adjust.append('-')
@@ -238,10 +232,6 @@ def prep_Data_Group(from_indiv=False,alt_columns=None):
 
                 column_name=pd.MultiIndex.from_tuples(data_column_total,names=data_name_full)
                 data_pivot_2.columns=column_name
-                print(data_pivot_2)
-                #data_pivot=pd.merge(data_pivot,data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner') 
-                #data_pivot=data_pivot.join(data_pivot_2,on=persistentData.Plot_Configurations["myConfig"].x, how='inner',lsuffix='', rsuffix='')
-                #this merge is creating the nightmare which is not removing duplicates in teh merge once generated ######## 
                 data_pivot=pd.concat([data_pivot,data_pivot_2],axis=1)
     
     else:
