@@ -50,12 +50,12 @@ def make_manual_versus_prompt_input(input_mode):
         return table_type_dropdown,[],[]
     elif input_mode =='Prompt':
         prompt_input=dcc.Textarea(value=None,placeholder='CURRENTLY NOT ACTIVE!! ~~ Input Prompt for Figure Generation, such as "Show me the Top 10 significant FA regions for Age_Class"',id='prompt_input',style={'width': '100%'})
-        
+
         return prompt_input,[],[]
     else:
         return None,[],[]
-    
-    
+
+
  ## CREATE THE WHOLE OF LOADING WITH THE TOP/BOTTOM COMPONENTS
 
 
@@ -72,7 +72,7 @@ def set_figure_to_output_Manual(select_table_4_plotting):
     else:
         message= 'Make Sure All Data Files Are Loaded and Exist At Path Location'
         return [html.Div(className='chart-item', children=[html.Div(children=dcc.Input(id="Error_on_loading_Manual", value=message,style={'width': '100%'}))])]
-     
+
 @callback(Output(component_id='output-container', component_property='children', allow_duplicate=True),
           Input(component_id='prompt_input', component_property='value'),prevent_initial_call=True)
 def set_figure_to_output_Prompt(prompt_text):
@@ -101,10 +101,10 @@ def get_radiobutton_pvalue(radio_pval):
     else:
         set_pval=radio_pval
         set_pval_value=0.05
-        
+
     new_items={set_pval:set_pval_value}
     persistentData.Plot_Configurations["myConfig"].filter.update(new_items)
-    return 
+    return
 
 @callback(Input(component_id='radio_TopN', component_property='value'))
 def get_radiobutton_topN(radio_TopN):
@@ -145,7 +145,7 @@ def get_hemisphere(hemisphere_value):
 def get_desired_grouping(rows, columns):
     persistentData.Plot_Configurations["myConfig"].groups_to_include=rows
     return
-    
+
 @callback(
     Output('group_selection_table', 'data'),
     Input('add-rows-button', 'n_clicks'),
@@ -167,18 +167,18 @@ def add_row(n_clicks, rows, columns):
 )
 def export_data_as_csv(n_clicks):
     if n_clicks >0:
-        
+
         if persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
             persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Group_Stats.path
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv':
             persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Indiv_Data.path
         elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
             persistentData.Plot_Configurations['myConfig'].data_path=persistentData.Group_Data.path
-        
+
         config_out=json.dumps(persistentData.Plot_Configurations["myConfig"].__dict__)
         data_out=persistentData.Plot_Configurations['Data'].to_csv()
         data_filename=persistentData.Plot_Configurations["myConfig"].x+"_vs_"+persistentData.Plot_Configurations["myConfig"].y+"_data_for_fig.csv"
-        
+
         config_data_out = f"#{config_out}\n{data_out}"
         return dict(content=config_data_out, filename=data_filename)
     else:
@@ -188,16 +188,16 @@ def export_data_as_csv(n_clicks):
 
 @callback(Output(component_id='output-container',component_property='children', allow_duplicate=True),
           Input(component_id='go_button',component_property='n_clicks'),prevent_initial_call=True)
-def make_graph(isgo): 
+def make_graph(isgo):
     if "go_button" == ctx.triggered_id and isgo>0:
         plot_data_out=use_config_on_Data()
         persistentData.Plot_Configurations['Data']=plot_data_out
         chart=make_chart(plot_data_out)
-        
-        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)  
+
+        download_button=html.Button("Download CSV", id="csv-button", n_clicks=0)
         download_link=dcc.Download(id="download_data")
-        download=html.Div([download_button,download_link])       
-        
+        download=html.Div([download_button,download_link])
+
         return [chart,html.Div(className='chart-item', children=[html.Div(children=download)],style={'display':'grid','width': '100%'})]
     else:
         return None
@@ -208,4 +208,4 @@ Look at this for potential to have marker sizes change based on zoom, but this a
 
 https://community.plotly.com/t/making-marker-size-dynamic-when-changing-browser-sizes/82260
 
-""" 
+"""

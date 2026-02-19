@@ -58,8 +58,10 @@ def load_stats(path):
 
 
 def collect_from_data(sheet,data_playwith):
-    if (persistentData.Plot_Configurations["myConfig"].filter.get('pval') == None):
-        return data_playwith #-- This would just not apply a filter in the case of indicating that there is no Filtering... but we want it to be dumb so no extra problems.
+    if (persistentData.Plot_Configurations["myConfig"].filter.get('pval') == None) and (persistentData.Plot_Configurations["myConfig"].filter.get('pval_BH')==None):
+        return data_playwith
+         #-- This would just not apply a filter in the case of indicating that there is no Filtering... but we want it to be dumb so no extra problems.
+         # Lol it caused a problem because in pval_BH filtering where there was no data it triggered here.
     else:
         # Takes the (un)filtered GStats Results and combines it with the Indiv or Group Data Table so we have reduced or Maintained the # of ROI
         df=sheet[persistentData.Plot_Configurations["myConfig"].x].to_frame()
@@ -79,6 +81,7 @@ def filter_stat_sheet(config_filter,sheet):
                 reduced_sheet = reduced_sheet[reduced_sheet[f] < config_filter[f]]
             else:
                 reduced_sheet=reduced_sheet[reduced_sheet[f] == config_filter[f]]
+
     return reduced_sheet
 
 def use_config_on_Data():
@@ -86,6 +89,7 @@ def use_config_on_Data():
         Reduced_Stats=filter_stat_sheet(persistentData.Plot_Configurations["myConfig"].filter,persistentData.Group_Stats.data)
     else:
         Reduced_Stats=persistentData.Group_Stats.data
+
     if  persistentData.Plot_Configurations["myConfig"].use_sheet == 'stats':
         plot_data=reduce_to_top(persistentData.Plot_Configurations["myConfig"].reduce_reorder,Reduced_Stats)
     elif persistentData.Plot_Configurations["myConfig"].use_sheet == 'indiv' or persistentData.Plot_Configurations["myConfig"].use_sheet == 'group':
