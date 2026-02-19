@@ -3,6 +3,7 @@
 
 # In[ ]:
 from dash import Dash, dcc, html
+import sys
 from helper_functions import *
 from classes import *
 from callbacks import *
@@ -53,5 +54,10 @@ app.layout = html.Div([
 
     ## RUN THE DASH APP
 if __name__ == '__main__':
+    if len(sys.argv) >= 4:
+        default_files["Result"]=sys.argv[1]
+        default_files["Group"]=sys.argv[2]
+        default_files["Subject"]=sys.argv[3]
+
     app.run(debug=True)
     
