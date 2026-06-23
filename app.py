@@ -12,8 +12,21 @@ from persistentData import default_files
 
     ## RUN THE DASH APP
 if __name__ == '__main__':
+    
     port_address=8050
-    if len(sys.argv) >= 5:
+    if len(sys.argv) == 1:
+        # No input arguements put at standard port_address with no default files
+        default_files["Result"]=''
+        default_files["Group"]=''
+        default_files["Subject"]=''
+    elif len(sys.argv) == 2:
+        # put at set/random port_address with no default files
+        port_address=sys.argv[1]
+        default_files["Result"]=''
+        default_files["Group"]=''
+        default_files["Subject"]=''
+    elif len(sys.argv) == 5:
+        # put at set/random port_address with all default files
         port_address=sys.argv[1]
         default_files["Result"]=sys.argv[2]
         default_files["Group"]=sys.argv[3]
